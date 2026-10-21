@@ -54,7 +54,7 @@ The full look also depends on settings outside the extension. They are meant to 
 |---------|-------|
 | Dash to Dock `transparency-mode` | `FIXED` |
 | Dash to Dock `background-opacity` | `0.0` |
-| Dash to Dock `click-action` | `focus-or-previews` (a click never minimizes, like on macOS) |
+| Dash to Dock `click-action` | `focus-minimize-or-previews` (a deliberate departure from macOS: a click on the focused app minimizes it) |
 | Dash to Dock `running-indicator-style` | `DEFAULT` (one small dot per open app) |
 | Blur My Shell dock `static-blur` | `false` (live blur of what is behind the dock) |
 | Blur My Shell dock pipeline | One "Liquid Glass" (`refraction`) effect: `blur_radius` 10, `edge_size` 16, `tint` 0, `shadow` 0.1, `specular_strength` 0.6 |
