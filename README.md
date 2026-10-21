@@ -6,9 +6,9 @@ A GNOME Shell extension that turns Ubuntu Dock into a macOS-like dock: a glass p
 
 ## Quick path (development install)
 
-1. Link the repository as an installed extension:
+1. From the repository root, link it as an installed extension:
    ```sh
-   ln -s ~/dock-glass ~/.local/share/gnome-shell/extensions/dock-glass@local
+   ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@local
    gnome-extensions enable dock-glass@local
    ```
 2. Restart GNOME Shell: on X11 press `Alt+F2`, type `r`, press Enter. On Wayland, log out and back in.
