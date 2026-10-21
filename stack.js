@@ -1,4 +1,4 @@
-// macOS-like stacks: a fan or a grid of files that springs out of a dock
+// macOS-like stacks: a fan or a grid of places that springs out of a dock
 // icon. The layout math lives in stackLayout.js; this file builds the
 // actors, runs the animations and handles input while a stack is open.
 import Clutter from 'gi://Clutter';
@@ -11,10 +11,6 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {chooseView, fanSlots, gridLayout, staggerDelay} from './stackLayout.js';
-
-Gio._promisify(Gio.File.prototype, 'enumerate_children_async');
-Gio._promisify(Gio.FileEnumerator.prototype, 'next_files_async');
-Gio._promisify(Gio.FileEnumerator.prototype, 'close_async');
 
 // Fan: 48px icons one step apart, bending right gently (about 70px over a
 // full ten-item fan), like the macOS Dock.
@@ -30,63 +26,26 @@ const GRID_CELL_PADDING = 4;
 const GRID_COLUMNS = 5;
 const GRID_MAX_ROWS = 4;
 const GRID_GAP = 10;
-// Items a stack loads at most; the rest stay reachable through Files.
-const MAX_ITEMS = 40;
 
-// Opening springs items out one after another; closing retracts them all at
-// once and fades them out before they reach the icon, so they never pile up.
+// Undocking (open): items spring out of the dock icon one after another,
+// nearest first, and each label fades in once its icon has landed.
+// Docking (close), the same in reverse: labels fade out first so no text
+// ever overlaps, then the items fly back into the icon one after another,
+// farthest first, shrinking onto the pile and fading only as they arrive.
 const OPEN_MS = 260;
-const STAGGER_MS = 140;
-const CLOSE_MS = 170;
-const CLOSE_FADE_MS = 110;
+const OPEN_STAGGER_MS = 140;
+const LABEL_FADE_MS = 100;
+const CLOSE_MS = 230;
+const CLOSE_STAGGER_MS = 90;
+// Share of the close motion after which an item starts fading into the icon.
+const CLOSE_FADE_AT = 0.55;
 
-const FILE_ATTRIBUTES = [
-    'standard::name',
-    'standard::display-name',
-    'standard::icon',
-    'standard::type',
-    'standard::is-hidden',
-    'standard::is-backup',
-    'thumbnail::path',
-    'thumbnail::is-valid',
-].join(',');
-
-export function openUri(uri) {
+function openUri(uri) {
     try {
         Gio.AppInfo.launch_default_for_uri(uri, global.create_app_launch_context(0, -1));
     } catch (e) {
         console.error(`[dock-glass] Cannot open ${uri}: ${e}`);
     }
-}
-
-// Visible entries of a folder, folders first, then by name.
-export async function listFolder(folder, cancellable = null) {
-    const enumerator = await folder.enumerate_children_async(FILE_ATTRIBUTES,
-        Gio.FileQueryInfoFlags.NONE, GLib.PRIORITY_DEFAULT, cancellable);
-    const infos = [];
-    for (;;) {
-        const batch = await enumerator.next_files_async(64, GLib.PRIORITY_DEFAULT, cancellable);
-        if (!batch.length)
-            break;
-        infos.push(...batch.filter(info => !info.get_is_hidden() && !info.get_is_backup()));
-    }
-    enumerator.close_async(GLib.PRIORITY_DEFAULT, null).catch(() => {});
-
-    const isFolder = info => info.get_file_type() === Gio.FileType.DIRECTORY;
-    infos.sort((a, b) => (isFolder(b) - isFolder(a)) ||
-        a.get_display_name().localeCompare(b.get_display_name()));
-
-    return infos.slice(0, MAX_ITEMS).map(info => {
-        const thumbnail = info.get_attribute_boolean('thumbnail::is-valid')
-            ? info.get_attribute_byte_string('thumbnail::path') : null;
-        return {
-            name: info.get_display_name(),
-            gicon: thumbnail
-                ? new Gio.FileIcon({file: Gio.File.new_for_path(thumbnail)})
-                : info.get_icon(),
-            uri: folder.get_child(info.get_name()).get_uri(),
-        };
-    });
 }
 
 // Places like the Files sidebar: home, the usual folders, then bookmarks.
@@ -215,25 +174,38 @@ export class Stack {
         const root = this._root;
         root.reactive = false;
         this._notifyClosed();
-        let pending = this._parts.length;
+        const count = this._parts.length;
+        let pending = count;
         if (!pending) {
             root.destroy();
             return;
         }
-        for (const {actor, hidden} of this._parts) {
+        this._parts.forEach(({actor, hidden, label}, i) => {
             const {opacity, ...motion} = hidden;
             actor.remove_all_transitions();
-            actor.ease({opacity, duration: CLOSE_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            label?.remove_all_transitions();
+            label?.ease({opacity: 0, duration: LABEL_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+
+            // Farthest first, after the labels are gone.
+            const delay = (label ? LABEL_FADE_MS : 0) +
+                staggerDelay(count - 1 - i, count, CLOSE_STAGGER_MS);
+            actor.ease({
+                opacity,
+                duration: CLOSE_MS * (1 - CLOSE_FADE_AT),
+                delay: delay + CLOSE_MS * CLOSE_FADE_AT,
+                mode: Clutter.AnimationMode.EASE_IN_QUAD,
+            });
             actor.ease({
                 ...motion,
                 duration: CLOSE_MS,
-                mode: Clutter.AnimationMode.EASE_IN_CUBIC,
+                delay,
+                mode: Clutter.AnimationMode.EASE_IN_OUT_CUBIC,
                 onStopped: () => {
                     if (--pending === 0)
                         root.destroy();
                 },
             });
-        }
+        });
     }
 
     // Closes at once, without animation (used when the dock goes away). The
@@ -320,11 +292,12 @@ export class Stack {
                 opacity: 0,
             };
             actor.set(hidden);
-            const delay = staggerDelay(i, entries.length, STAGGER_MS);
+            label.opacity = 0;
+            const delay = staggerDelay(i, entries.length, OPEN_STAGGER_MS);
             // Opacity gets its own non-overshooting ease: Clutter stores it in
             // 8 bits, so EASE_OUT_BACK's overshoot past 255 would wrap it to
             // almost transparent mid-spring.
-            actor.ease({opacity: 255, duration: OPEN_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            actor.ease({opacity: 255, duration: OPEN_MS / 2, delay, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
             actor.ease({
                 translation_x: 0,
                 translation_y: 0,
@@ -334,7 +307,13 @@ export class Stack {
                 delay,
                 mode: Clutter.AnimationMode.EASE_OUT_BACK,
             });
-            this._parts.push({actor, hidden});
+            label.ease({
+                opacity: 255,
+                duration: LABEL_FADE_MS,
+                delay: delay + OPEN_MS * 0.7,
+                mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            });
+            this._parts.push({actor, hidden, label});
         });
     }
 
