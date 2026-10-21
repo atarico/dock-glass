@@ -1,4 +1,4 @@
-// Run with: node --test test/
+// Run from the repository root with: node --test
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 

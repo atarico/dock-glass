@@ -30,8 +30,8 @@ The GNOME Shell integration has no automated tests; check it by hand after resta
 
 | Feature | What it does | Where |
 |---------|--------------|-------|
-| Pill shape | Fully rounded dock; the glass's specular edge is the rim | `stylesheet.css` |
-| Continuous magnification | Like the macOS Dock: icons grow from their bottom edge by their distance from the pointer, 1.4x under it and back to rest size three tiles away along a cosine curve. They never shrink, neighbors spread apart instead of overlapping, and the pill widens with them | `magnifier.js`, `extension.js` |
+| Pill shape | Fully rounded dock with a light inner rim | `stylesheet.css` |
+| Continuous magnification | Like the macOS Dock: icons grow from their bottom edge by their distance from the pointer, 1.4x under it and back to rest size three icon slots away along a cosine curve. They never shrink, neighbors spread apart instead of overlapping, and the pill widens with them | `magnifier.js`, `extension.js` |
 | Launch bounce | A dock icon bounces until the launched app shows its window, starting from its current magnified size | `extension.js` |
 
 Like on macOS, new windows use the system open animation; the genie belongs to minimize and restore, which Magic Lamp provides.
@@ -61,8 +61,8 @@ The full look also depends on settings outside the extension. They are meant to 
 
 ## How it works
 
-- **Headroom.** Ubuntu Dock clips its content vertically. The stylesheet raises the icon tiles' top padding and adds the same top margin to the pill background. The pill keeps its size, and the largest icon has room to rise above it. Sideways, the extension turns off the scroll view's clip so spread icons stay visible.
-- **Magnification.** A per-dock `Clutter.Timeline` reads the pointer in stage coordinates every frame while it is over the pill. `magnifier.js` turns each icon's distance from the smoothed pointer into a scale, and the extra width of the icons between them into a sideways shift. The extension applies them as transforms: the scale on each icon, the shift on its button (so the running dot follows), and a horizontal scale and shift on the pill background, which Blur My Shell's glass follows. No allocation changes, so the dock's input region, intellihide and minimize targets keep their rest geometry. The loop stops once the icons settle, restarts on pointer motion, and after the pointer leaves it fades out to exactly the rest layout.
+- **Headroom.** Ubuntu Dock clips its content vertically. The stylesheet raises the icon tiles' top padding and adds the same top margin to the pill background. The pill keeps its size, and the largest icon has room to rise above it. Sideways, the extension turns off the scroll view's clip and widens the slide container's clip, which Ubuntu Dock resets to the pill's rest width on every allocation, so spread icons and the wider glass stay visible.
+- **Magnification.** A per-dock `Clutter.Timeline` reads the pointer in stage coordinates every frame while it is over the pill. `magnifier.js` turns each icon's distance from the smoothed pointer into a scale, and the extra width of the icons between them into a sideways shift. The extension applies them as transforms: the scale on each icon, the shift on its button (so the running dot follows), and a horizontal scale and shift on the pill background, which Blur My Shell's glass follows. No allocation changes, so the dock's input region and intellihide keep their rest geometry. Ubuntu Dock measures minimize targets from the button's transformed position, so the extension wraps that measurement to leave the spread shift out, and Magic Lamp's genie aims at the icon's rest slot. The loop stops once the icons settle, restarts on pointer motion, and after the pointer leaves it fades out to exactly the rest layout.
 ## License
 
 GPL-3.0-or-later, see [LICENSE](LICENSE).

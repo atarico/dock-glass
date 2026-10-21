@@ -18,13 +18,16 @@ const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
 // the pill widens with them, like the macOS Dock. The peak is the
 // enlargement under the pointer, the equivalent of the macOS Magnification
 // slider. Apple publishes no falloff curve; a cosine bell that reaches the
-// rest size three tiles away matches common recreations of the Dock.
-// Ubuntu Dock clips its content vertically. stylesheet.css raises the tile
-// top padding to 24px (with a matching background margin, so the pill keeps
-// its size), leaving 30px above each 48px icon image (6px icon padding +
-// 24px); growing from the 60px tile bottom, the image top rises 54px * 0.4.
+// rest size three icon slots away matches common recreations of the Dock.
+// Ubuntu Dock clips its content to the pill at rest. stylesheet.css raises
+// the tile top padding to 24px (with a matching background margin, so the
+// pill keeps its size), leaving 30px above each 48px icon image (6px icon
+// padding + 24px); growing from the 60px tile bottom, the image top rises
+// 54px * 0.4. Sideways, the clip is widened by CLIP_MARGIN_PX on each side:
+// the pill's ends move out by at most 0.4 * 3 slots / 2 (about 38px).
 const MAGNIFY_PEAK = 1.4;
-const MAGNIFY_RADIUS_TILES = 3;
+const MAGNIFY_RADIUS_SLOTS = 3;
+const CLIP_MARGIN_PX = 64;
 // Time constants of the per-frame exponential smoothing: the pointer
 // position lags slightly so fast sweeps stay fluid, and the whole
 // magnification fades in when the pointer enters and out when it leaves.
@@ -48,6 +51,7 @@ export default class DockGlassExtension extends Extension {
         this._buttons = new Map();
         this._bounces = new Map();
         this._magnifiers = new Map();
+        this._clips = new Map();
 
         Main.extensionManager.connectObject('extension-state-changed',
             (_manager, extension) => {
@@ -156,6 +160,10 @@ export default class DockGlassExtension extends Extension {
             const showApps = dock.dash._showAppsIcon;
             this._trackButton(showApps?.toggleButton, dock, showApps?.icon);
 
+            // Only bottom (horizontal) docks magnify; leave the others as is.
+            if (!dock.dash._isHorizontal)
+                continue;
+
             // Spread icons reach past the scroll view, which clips to its
             // allocation by default; the pill scales around its center.
             const scroller = dock.dash._boxContainer;
@@ -163,14 +171,40 @@ export default class DockGlassExtension extends Extension {
             if (scroller)
                 scroller.clip_to_view = false;
             dock.dash._background?.set_pivot_point(0.5, 0.5);
+
+            // The slide container clips the dock (glass included) to the pill
+            // at rest on every allocation; widen that clip sideways each time.
+            dock._box?.connectObject('notify::clip-rect', () => this._widenClip(dock), this);
+            this._widenClip(dock);
         }
+    }
+
+    _widenClip(dock) {
+        const box = dock._box;
+        if (!box?.has_clip)
+            return;
+
+        const [x, y, width, height] = box.get_clip();
+        const widened = this._clips.get(dock);
+        // The clip is stored as float32, so compare with a tolerance.
+        if (widened && [x, y, width, height].every((v, i) => Math.abs(v - widened[i]) < 0.01))
+            return;
+
+        const clip = [x - CLIP_MARGIN_PX, y, width + 2 * CLIP_MARGIN_PX, height];
+        this._clips.set(dock, clip);
+        box.set_clip(...clip);
     }
 
     _detachDocks() {
         for (const [box, dock] of this._boxes) {
             box.disconnectObject(this);
             dock.disconnectObject(this);
-            if (dock.dash?._boxContainer)
+            if (this._clips.has(dock)) {
+                dock._box.disconnectObject(this);
+                // The slide container sets its own clip again on relayout.
+                dock._slider?.queue_relayout();
+            }
+            if (dock.dash?._isHorizontal && dock.dash._boxContainer)
                 dock.dash._boxContainer.clip_to_view = this._clipToView;
             const background = dock.dash?._background;
             if (background) {
@@ -180,6 +214,7 @@ export default class DockGlassExtension extends Extension {
             }
         }
         this._boxes.clear();
+        this._clips.clear();
         for (const dock of [...this._magnifiers.keys()])
             this._stopMagnifier(dock);
         for (const button of [...this._buttons.keys()])
@@ -208,6 +243,22 @@ export default class DockGlassExtension extends Extension {
                 }
             };
         }
+
+        // Ubuntu Dock publishes the minimize target from the button's
+        // transformed position, so measure it without the spread shift: the
+        // genie aims at the icon's rest slot, not where the magnifier moved it.
+        const updateIconGeometry = button.updateIconGeometry;
+        if (updateIconGeometry) {
+            button.updateIconGeometry = (...args) => {
+                const shift = button.translation_x;
+                button.translation_x = 0;
+                try {
+                    return updateIconGeometry.apply(button, args);
+                } finally {
+                    button.translation_x = shift;
+                }
+            };
+        }
     }
 
     _untrackButton(button) {
@@ -216,6 +267,7 @@ export default class DockGlassExtension extends Extension {
         this._stopBounce(button, true);
         button.disconnectObject(this);
         delete button.animateLaunch;
+        delete button.updateIconGeometry;
         icon.remove_all_transitions();
         icon.set_scale(1, 1);
         icon.set_pivot_point(0, 0);
@@ -297,7 +349,7 @@ export default class DockGlassExtension extends Extension {
             const layout = magnify({
                 centers: rest.centers,
                 pointer: magnifier.pointer ?? pointerX,
-                radius: MAGNIFY_RADIUS_TILES * rest.tile,
+                radius: MAGNIFY_RADIUS_SLOTS * rest.slot,
                 peak: MAGNIFY_PEAK,
                 strength: fadedOut ? 0 : magnifier.strength,
                 start: rest.start,
@@ -342,9 +394,10 @@ export default class DockGlassExtension extends Extension {
     }
 
     // The dock as laid out without magnification, in stage coordinates: the
-    // tracked buttons in on-screen order with their centers, the pill's ends,
-    // and the dash's top. Transforms this extension adds are undone, so the
-    // magnifier never feeds on its own output.
+    // tracked buttons in on-screen order with their centers, the icon slot
+    // (the smallest center-to-center step, so the separator gap does not
+    // count), the pill's ends, and the dash's top. Transforms this extension
+    // adds are undone, so the magnifier never feeds on its own output.
     _restLayout(dock) {
         const {dash} = dock;
         const background = dash._background;
@@ -356,12 +409,14 @@ export default class DockGlassExtension extends Extension {
             const [x] = button.get_transformed_position();
             return x - button.translation_x + button.width / 2;
         });
+        const steps = centers.slice(1).map((center, i) => center - centers[i])
+            .filter(step => step > 0);
         const [dashX, dashY] = dash.get_transformed_position();
         const start = dashX + background.x;
         return {
             buttons,
             centers,
-            tile: buttons[0].width,
+            slot: steps.length ? Math.min(...steps) : buttons[0].width,
             start,
             end: start + background.width,
             top: dashY,
