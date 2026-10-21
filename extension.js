@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
 // Ubuntu Dock icons, plus a macOS-like places stack (stack.js) for Files.
 // Like on macOS, windows open with the system animation; the genie belongs

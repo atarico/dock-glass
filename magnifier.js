@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pure math of the macOS-like magnifier. It has no gi:// imports, so node can
 // test it (test/magnifier.test.js). Distances are stage pixels along the dock,
 // measured on the unmagnified layout; `strength` fades the whole effect in

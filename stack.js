@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // macOS-like stacks: a fan or a grid of places that springs out of a dock
 // icon. The layout math lives in stackLayout.js; this file builds the
 // actors, runs the animations and handles input while a stack is open.

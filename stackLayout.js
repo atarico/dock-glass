@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 // Pure layout math of the macOS-like stacks (stack.js). It has no gi://
 // imports, so node can test it (test/stackLayout.test.js). Distances are
 // stage pixels; fan slots are relative to the top center of the dock icon.

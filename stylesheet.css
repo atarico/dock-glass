@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
 /* Pill-shaped glass background for Ubuntu Dock at the bottom of the screen.
  * St reduces oversized radii to half the actor's height, which yields a pill.
  * Ubuntu Dock sets background and border colors inline, which win over any
