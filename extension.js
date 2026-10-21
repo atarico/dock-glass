@@ -14,7 +14,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {approach, magnify} from './magnifier.js';
-import {Stack, listFolder, listPlaces} from './stack.js';
+import {Stack, listFolder, listPlaces, openUri} from './stack.js';
 
 const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
 
@@ -234,20 +234,24 @@ export default class DockGlassExtension extends Extension {
         button.connect('clicked', () => this._openStack(dock, item, icon, {
             title: name,
             openLabel: OPEN_FOLDER_LABEL,
-            onOpenFolder: () => Gio.AppInfo.launch_default_for_uri(folder.get_uri(),
-                global.create_app_launch_context(0, -1)),
-            items: listFolder(folder),
+            onOpenFolder: () => openUri(folder.get_uri()),
+            items: () => listFolder(folder),
         }));
         this._stackItems.set(dock, item);
         item.connect('destroy', () => this._stackItems.delete(dock));
         this._trackButton(button, dock, icon);
     }
 
+    // Returns whether the stack opened.
     _openStack(dock, item, anchor, params) {
         if (this._stack)
-            return;
+            return false;
 
-        // Holding the dock's menu state keeps it shown under the stack.
+        // Holding the dock's menu state keeps it shown under the stack; it is
+        // set before the grab, so losing hover to the grab never hides it. The
+        // stack's grab hides pointer motion from the dock, so on close the
+        // button's hover (and its label) and the magnifier are brought up to
+        // date with where the pointer is now.
         const stack = new Stack({
             ...params,
             anchor,
@@ -255,20 +259,26 @@ export default class DockGlassExtension extends Extension {
                 if (this._stack === stack)
                     this._stack = null;
                 dock.dash?._itemMenuStateChanged?.(item, false);
+                item.child?.sync_hover?.();
+                item.hideLabel?.();
+                this._wakeMagnifier(dock);
             },
         });
-        if (!stack.open())
-            return;
-        this._stack = stack;
         dock.dash._itemMenuStateChanged?.(item, true);
+        this._stack = stack;
+        if (stack.open())
+            return true;
+        this._stack = null;
+        dock.dash._itemMenuStateChanged?.(item, false);
+        return false;
     }
 
     _openPlaces(dock, button, icon) {
-        this._openStack(dock, button.get_parent(), icon, {
+        return this._openStack(dock, button.get_parent(), icon, {
             title: FILES_LABELS.title,
             openLabel: FILES_LABELS.open,
             onOpenFolder: () => Object.getPrototypeOf(button).activate.call(button, 1),
-            items: listPlaces(FILES_LABELS.home),
+            items: () => listPlaces(FILES_LABELS.home),
         });
     }
 
@@ -354,8 +364,8 @@ export default class DockGlassExtension extends Extension {
                 const modified = mods & (Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.SHIFT_MASK);
                 if (clickButton === 1 && !modified && button.app.get_n_windows() === 0) {
                     try {
-                        this._openPlaces(dock, button, icon);
-                        return;
+                        if (this._openPlaces(dock, button, icon))
+                            return;
                     } catch (e) {
                         console.error(`[dock-glass] Cannot open the Files stack: ${e}`);
                     }

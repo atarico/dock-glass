@@ -47,6 +47,8 @@
   border-radius: 7px;
   padding: 3px 9px;
   font-size: 10pt;
+  /* Long names end in an ellipsis (stack.js) instead of a very wide fan. */
+  max-width: 260px;
 }
 
 .dock-glass-stack-fan-item:hover .dock-glass-stack-label {
@@ -85,6 +87,7 @@
   background-color: rgba(255, 255, 255, 0.24);
 }
 
+/* stack.js counts this padding in the grid's width (GRID_CELL_PADDING). */
 .dock-glass-stack-cell {
   border-radius: 10px;
   padding: 4px;

@@ -22,17 +22,23 @@ const FAN_ICON_SIZE = 48;
 const FAN_STEP = 58;
 const FAN_BEND = 0.00025;
 // Grid: up to five columns of 96px cells, four rows visible, then scroll.
+// Each cell button adds the .dock-glass-stack-cell padding (stylesheet.css)
+// around its 96px content.
 const GRID_ICON_SIZE = 56;
 const GRID_CELL = 96;
+const GRID_CELL_PADDING = 4;
 const GRID_COLUMNS = 5;
 const GRID_MAX_ROWS = 4;
 const GRID_GAP = 10;
 // Items a stack loads at most; the rest stay reachable through Files.
 const MAX_ITEMS = 40;
 
+// Opening springs items out one after another; closing retracts them all at
+// once and fades them out before they reach the icon, so they never pile up.
 const OPEN_MS = 260;
-const CLOSE_MS = 180;
 const STAGGER_MS = 140;
+const CLOSE_MS = 170;
+const CLOSE_FADE_MS = 110;
 
 const FILE_ATTRIBUTES = [
     'standard::name',
@@ -45,7 +51,7 @@ const FILE_ATTRIBUTES = [
     'thumbnail::is-valid',
 ].join(',');
 
-function openUri(uri) {
+export function openUri(uri) {
     try {
         Gio.AppInfo.launch_default_for_uri(uri, global.create_app_launch_context(0, -1));
     } catch (e) {
@@ -130,8 +136,9 @@ export function listPlaces(homeLabel) {
     return places;
 }
 
-// One open stack. `items` is an array or a promise of {name, gicon, uri};
-// `openLabel` and `onOpenFolder` are the "open in Files" entry on top.
+// One open stack. `items` is a function returning an array or a promise of
+// {name, gicon, uri}, called only once the stack is open; `openLabel` and
+// `onOpenFolder` are the "open in Files" entry on top.
 export class Stack {
     constructor({anchor, title, openLabel, onOpenFolder, items, onClosed}) {
         this._anchor = anchor;
@@ -185,7 +192,7 @@ export class Stack {
             return Clutter.EVENT_PROPAGATE;
         });
 
-        Promise.resolve(this._items).then(items => {
+        Promise.resolve().then(() => this._items()).then(items => {
             if (!this._closing)
                 this._show(items);
         }).catch(e => {
@@ -206,34 +213,40 @@ export class Stack {
         }
         this._onClosed?.();
 
+        // Let clicks through while the stack retracts.
         const root = this._root;
+        root.reactive = false;
         let pending = this._parts.length;
         if (!pending) {
             root.destroy();
             return;
         }
-        this._parts.forEach((part, i) => {
-            part.actor.remove_all_transitions();
-            part.actor.ease({
-                ...part.hidden,
+        for (const {actor, hidden} of this._parts) {
+            const {opacity, ...motion} = hidden;
+            actor.remove_all_transitions();
+            actor.ease({opacity, duration: CLOSE_FADE_MS, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
+            actor.ease({
+                ...motion,
                 duration: CLOSE_MS,
-                delay: staggerDelay(this._parts.length - 1 - i, this._parts.length, STAGGER_MS / 2),
-                mode: Clutter.AnimationMode.EASE_IN_QUAD,
+                mode: Clutter.AnimationMode.EASE_IN_CUBIC,
                 onStopped: () => {
                     if (--pending === 0)
                         root.destroy();
                 },
             });
-        });
+        }
     }
 
     // Closes at once, without animation (used when the dock goes away).
     destroy() {
+        const wasOpen = !this._closing;
         this._closing = true;
         if (this._grab) {
             Main.popModal(this._grab);
             this._grab = null;
         }
+        if (wasOpen)
+            this._onClosed?.();
         this._root?.destroy();
     }
 
@@ -263,11 +276,13 @@ export class Stack {
 
         entries.forEach((entry, i) => {
             const box = new St.BoxLayout({style_class: 'dock-glass-stack-fan-box'});
-            box.add_child(new St.Label({
+            const label = new St.Label({
                 text: entry.name,
                 style_class: 'dock-glass-stack-label',
                 y_align: Clutter.ActorAlign.CENTER,
-            }));
+            });
+            label.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+            box.add_child(label);
             box.add_child(new St.Icon({gicon: entry.gicon, icon_size: FAN_ICON_SIZE}));
             const actor = new St.Button({
                 style_class: 'dock-glass-stack-fan-item',
@@ -286,7 +301,6 @@ export class Stack {
             actor.set_position(Math.round(iconX + FAN_ICON_SIZE / 2 - width),
                 Math.round(iconY - height / 2));
             actor.set_pivot_point((width - FAN_ICON_SIZE / 2) / width, 0.5);
-            actor.rotation_angle_z = slots[i].angle;
 
             // Each item springs out of the dock icon, nearest ones first.
             const hidden = {
@@ -297,14 +311,18 @@ export class Stack {
                 opacity: 0,
             };
             actor.set(hidden);
+            const delay = staggerDelay(i, entries.length, STAGGER_MS);
+            // Opacity gets its own non-overshooting ease: Clutter stores it in
+            // 8 bits, so EASE_OUT_BACK's overshoot past 255 would wrap it to
+            // almost transparent mid-spring.
+            actor.ease({opacity: 255, duration: OPEN_MS, delay, mode: Clutter.AnimationMode.EASE_OUT_QUAD});
             actor.ease({
                 translation_x: 0,
                 translation_y: 0,
                 scale_x: 1,
                 scale_y: 1,
-                opacity: 255,
                 duration: OPEN_MS,
-                delay: staggerDelay(i, entries.length, STAGGER_MS),
+                delay,
                 mode: Clutter.AnimationMode.EASE_OUT_BACK,
             });
             this._parts.push({actor, hidden});
@@ -315,12 +333,18 @@ export class Stack {
         const layout = gridLayout({
             count: items.length,
             columns: GRID_COLUMNS,
-            cell: GRID_CELL,
+            cell: GRID_CELL + 2 * GRID_CELL_PADDING,
             padding: 0,
             maxRows: GRID_MAX_ROWS,
         });
 
-        const panel = new St.BoxLayout({vertical: true, style_class: 'dock-glass-stack-grid'});
+        // Reactive, so a click on the panel's own background does not reach
+        // the catcher behind it and close the stack.
+        const panel = new St.BoxLayout({
+            vertical: true,
+            reactive: true,
+            style_class: 'dock-glass-stack-grid',
+        });
         const header = new St.BoxLayout({style_class: 'dock-glass-stack-header'});
         header.add_child(new St.Label({
             text: this._title,

@@ -34,16 +34,6 @@ test('the fan curves to the right more and more as it rises', () => {
     }
 });
 
-test('fan items tilt along the curve, a few degrees at most', () => {
-    const slots = fanSlots({...FAN, count: MAX_FAN_ITEMS});
-    let previous = 0;
-    for (const slot of slots) {
-        assert.ok(slot.angle >= previous, 'tilt decreases');
-        assert.ok(slot.angle <= 12, `tilt ${slot.angle} is too strong`);
-        previous = slot.angle;
-    }
-});
-
 test('the grid fills rows left to right with at most the given columns', () => {
     const grid = gridLayout({count: 11, columns: 4, cell: 96, padding: 16, maxRows: 4});
     assert.equal(grid.columns, 4);
