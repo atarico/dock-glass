@@ -22,6 +22,14 @@
   padding-top: 24px !important;
 }
 
+/* The running dot (running-indicator-style DEFAULT) goes right under the
+ * icon image, like on macOS. The shell theme raises it 21px for the overview
+ * dash, which put it over the lower part of dock icons; at 0 it sits at the
+ * bottom of the 60px icon box, below the 48px image and its 6px padding. */
+#dashtodockContainer.bottom #dash .dash-item-container .app-grid-running-dot {
+  margin-bottom: 0 !important;
+}
+
 /* No highlight square behind dock icons on hover, press or window focus:
  * like on macOS, the magnification is the hover feedback and the running
  * dot marks open apps. A focused square would also be clipped by the dock
