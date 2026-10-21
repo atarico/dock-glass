@@ -1,17 +1,28 @@
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
-// Ubuntu Dock icons. Like on macOS, windows open with the system animation;
-// the genie belongs to minimize and restore (Magic Lamp).
+// Ubuntu Dock icons, plus macOS-like stacks (stack.js) for the Desktop folder
+// and for Files. Like on macOS, windows open with the system animation; the
+// genie belongs to minimize and restore (Magic Lamp).
 // The pill shape lives in stylesheet.css.
 import Clutter from 'gi://Clutter';
+import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import St from 'gi://St';
 
+import * as Dash from 'resource:///org/gnome/shell/ui/dash.js';
+import * as IconGrid from 'resource:///org/gnome/shell/ui/iconGrid.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {approach, magnify} from './magnifier.js';
+import {Stack, listFolder, listPlaces} from './stack.js';
 
 const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
+
+// Stacks. Files opens its places stack only while it has no windows, so a
+// click still focuses or minimizes its windows otherwise.
+const FILES_APP_ID = 'org.gnome.Nautilus.desktop';
+const FILES_LABELS = {title: 'Archivos', open: 'Abrir Archivos', home: 'Carpeta personal'};
+const OPEN_FOLDER_LABEL = 'Abrir en Archivos';
 
 // Continuous macOS-like magnification (the math lives in magnifier.js).
 // Icons grow from their bottom edge, neighbors spread apart to make room and
@@ -52,6 +63,8 @@ export default class DockGlassExtension extends Extension {
         this._bounces = new Map();
         this._magnifiers = new Map();
         this._clips = new Map();
+        this._stackItems = new Map();
+        this._stack = null;
 
         Main.extensionManager.connectObject('extension-state-changed',
             (_manager, extension) => {
@@ -176,7 +189,87 @@ export default class DockGlassExtension extends Extension {
             // at rest on every allocation; widen that clip sideways each time.
             dock._box?.connectObject('notify::clip-rect', () => this._widenClip(dock), this);
             this._widenClip(dock);
+
+            try {
+                this._addDesktopItem(dock);
+            } catch (e) {
+                console.error(`[dock-glass] Cannot add the Desktop stack: ${e}`);
+            }
         }
+    }
+
+    // A dock item for the Desktop folder, right after the Trash like macOS
+    // stacks. It lives outside the icons box that Ubuntu Dock rebuilds.
+    _addDesktopItem(dock) {
+        const home = GLib.get_home_dir();
+        const path = GLib.get_user_special_dir(GLib.UserDirectory.DIRECTORY_DESKTOP);
+        const {dash} = dock;
+        if (!path || path === home || !dash._dashContainer || !dash._scrollView)
+            return;
+
+        const name = GLib.path_get_basename(path);
+        const folder = Gio.File.new_for_path(path);
+        const icon = new IconGrid.BaseIcon(name, {
+            setSizeManually: true,
+            showLabel: false,
+            createIcon: size => new St.Icon({
+                gicon: new Gio.ThemedIcon({name: 'user-desktop'}),
+                icon_size: size,
+            }),
+        });
+        icon.y_align = Clutter.ActorAlign.CENTER;
+        icon.setIconSize(dash.iconSize);
+        // Same tile style as Show Apps, so it matches the other dock icons.
+        const button = new St.Button({style_class: 'show-apps', track_hover: true, can_focus: true});
+        button.set_child(icon);
+
+        const item = new Dash.DashItemContainer();
+        item.setChild(button);
+        item.setLabelText(name);
+        dash._dashContainer.insert_child_above(item, dash._scrollView);
+        item.show(false);
+        dash._hookUpLabel?.(item, null);
+        dash.connectObject('icon-size-changed', () => icon.setIconSize(dash.iconSize), this);
+
+        button.connect('clicked', () => this._openStack(dock, item, icon, {
+            title: name,
+            openLabel: OPEN_FOLDER_LABEL,
+            onOpenFolder: () => Gio.AppInfo.launch_default_for_uri(folder.get_uri(),
+                global.create_app_launch_context(0, -1)),
+            items: listFolder(folder),
+        }));
+        this._stackItems.set(dock, item);
+        item.connect('destroy', () => this._stackItems.delete(dock));
+        this._trackButton(button, dock, icon);
+    }
+
+    _openStack(dock, item, anchor, params) {
+        if (this._stack)
+            return;
+
+        // Holding the dock's menu state keeps it shown under the stack.
+        const stack = new Stack({
+            ...params,
+            anchor,
+            onClosed: () => {
+                if (this._stack === stack)
+                    this._stack = null;
+                dock.dash?._itemMenuStateChanged?.(item, false);
+            },
+        });
+        if (!stack.open())
+            return;
+        this._stack = stack;
+        dock.dash._itemMenuStateChanged?.(item, true);
+    }
+
+    _openPlaces(dock, button, icon) {
+        this._openStack(dock, button.get_parent(), icon, {
+            title: FILES_LABELS.title,
+            openLabel: FILES_LABELS.open,
+            onOpenFolder: () => Object.getPrototypeOf(button).activate.call(button, 1),
+            items: listPlaces(FILES_LABELS.home),
+        });
     }
 
     _widenClip(dock) {
@@ -196,6 +289,14 @@ export default class DockGlassExtension extends Extension {
     }
 
     _detachDocks() {
+        this._stack?.destroy();
+        this._stack = null;
+        for (const [dock, item] of this._stackItems) {
+            dock.dash?.disconnectObject(this);
+            item.destroy();
+        }
+        this._stackItems.clear();
+
         for (const [box, dock] of this._boxes) {
             box.disconnectObject(this);
             dock._box?.disconnectObject(this);
@@ -244,6 +345,25 @@ export default class DockGlassExtension extends Extension {
             };
         }
 
+        // Files with no windows opens its places stack on a plain left click;
+        // otherwise (windows open, other buttons, Ctrl or Shift) the click
+        // keeps Ubuntu Dock's behavior.
+        if (button.app?.get_id() === FILES_APP_ID && button.activate) {
+            button.activate = clickButton => {
+                const [, , mods] = global.get_pointer();
+                const modified = mods & (Clutter.ModifierType.CONTROL_MASK | Clutter.ModifierType.SHIFT_MASK);
+                if (clickButton === 1 && !modified && button.app.get_n_windows() === 0) {
+                    try {
+                        this._openPlaces(dock, button, icon);
+                        return;
+                    } catch (e) {
+                        console.error(`[dock-glass] Cannot open the Files stack: ${e}`);
+                    }
+                }
+                Object.getPrototypeOf(button).activate.call(button, clickButton);
+            };
+        }
+
         // Ubuntu Dock publishes the minimize target from the button's
         // transformed position, so measure it without the spread shift: the
         // genie aims at the icon's rest slot, not where the magnifier moved it.
@@ -268,6 +388,7 @@ export default class DockGlassExtension extends Extension {
         button.disconnectObject(this);
         delete button.animateLaunch;
         delete button.updateIconGeometry;
+        delete button.activate;
         icon.remove_all_transitions();
         icon.set_scale(1, 1);
         icon.set_pivot_point(0, 0);
@@ -462,6 +583,10 @@ export default class DockGlassExtension extends Extension {
         const buttons = dock.dash._box.get_children()
             .map(item => item.child)
             .filter(button => this._buttons.has(button));
+        // The Desktop stack follows the icons box (and the Trash at its end).
+        const stackButton = this._stackItems.get(dock)?.child;
+        if (this._buttons.has(stackButton))
+            buttons.push(stackButton);
         const showApps = dock.dash._showAppsIcon?.toggleButton;
         if (this._buttons.has(showApps)) {
             if (this._manager?.settings?.showAppsAtTop)
