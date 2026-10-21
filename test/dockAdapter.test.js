@@ -69,6 +69,7 @@ test('the dock manager reports its docks and its signals', () => {
     const disconnected = [];
     const manager = {
         _allDocks: [docked],
+        settings: {showAppsAtTop: true},
         connect(signal, handler) {
             connected.push({signal, handler});
             return connected.length;
@@ -93,6 +94,9 @@ test('the dock manager reports its docks and its signals', () => {
     const docks = getDocks(manager);
     assert.equal(docks.length, 1);
     assert.ok(docks[0] instanceof Dock);
+    // Each wrapper reads its own dock and the manager's settings.
+    assert.equal(docks[0].frame, docked._box);
+    assert.equal(docks[0].showAppsAtTop, true);
     assert.deepEqual(getDocks(null), []);
 });
 
