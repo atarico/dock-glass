@@ -6,3 +6,7 @@ schemas/gschemas.compiled
 
 # Local code index
 .codegraph/
+
+# Local agent tooling: skill registry and working task notes
+.atl/
+odd/
