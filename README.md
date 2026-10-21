@@ -77,7 +77,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 - **Spanish stack labels.** The places stack shows "Abrir Archivos" and "Carpeta personal" until the extension gets translations. Folder names come from your system.
 - **Separator grouping.** Unpinned running apps still appear between Files and the Trash.
 - **Keyboard activation.** Opening Files from the keyboard (Enter on a focused icon, or `Super`+number) with no Files windows also opens the places stack.
-- **Ubuntu Dock internals.** The extension hooks private parts of Ubuntu Dock, so an Ubuntu Dock update can break it.
+- **Ubuntu Dock internals.** The extension hooks private parts of Ubuntu Dock, so an Ubuntu Dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
 
 <details>
 <summary><strong>How it works</strong></summary>
@@ -96,6 +96,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | File | Role |
 |------|------|
 | `extension.js` | Hooks into Ubuntu Dock: magnifier, clips, separator, Files stack, launch bounce |
+| `dockAdapter.js` | The only access to Ubuntu Dock's private internals: loading it, its dock manager and each dock's actors |
 | `openAnimation.js` | Replaces the window open animation with the genie |
 | `genieEffect.js` | The genie deform effect |
 | `magnifier.js` | Pure magnification math |
@@ -103,7 +104,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | `stackLayout.js` | Pure stack layout math |
 | `stylesheet.css` | Pill, headroom, running dot and stack styles |
 
-The pure math has no GNOME imports, so Node.js 22 or newer can test it from the repository root:
+The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer can test them from the repository root:
 
 ```sh
 node --test

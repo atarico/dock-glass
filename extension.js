@@ -2,6 +2,7 @@
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
 // Ubuntu Dock icons, a macOS-like places stack (stack.js) for Files, and a
 // genie effect from the dock icon when a window opens (openAnimation.js).
+// Ubuntu Dock's private internals are reached only through dockAdapter.js.
 // The pill shape lives in stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
@@ -12,11 +13,12 @@ import St from 'gi://St';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import {
+    DOCK_UUID, connectDockManager, getDockManager, getDocks, importDocking, isDockExtension,
+} from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
 import {OpenAnimation} from './openAnimation.js';
 import {Stack, listPlaces} from './stack.js';
-
-const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
 
 // Stacks. Files opens its places stack only while it has no windows, so a
 // click still focuses or minimizes its windows otherwise. When Files is the
@@ -58,7 +60,7 @@ export default class DockGlassExtension extends Extension {
         this._retryId = 0;
         this._docking = null;
         this._manager = null;
-        this._managerIds = [];
+        this._disconnectManager = null;
         this._boxes = new Map();
         this._buttons = new Map();
         this._bounces = new Map();
@@ -70,7 +72,7 @@ export default class DockGlassExtension extends Extension {
 
         Main.extensionManager.connectObject('extension-state-changed',
             (_manager, extension) => {
-                if (extension.uuid === DOCK_UUID)
+                if (isDockExtension(extension))
                     this._attachManager();
             }, this);
         this._loadDocking();
@@ -93,20 +95,15 @@ export default class DockGlassExtension extends Extension {
     }
 
     async _loadDocking() {
-        const dockExtension = Main.extensionManager.lookup(DOCK_UUID);
-        if (!dockExtension)
-            return;
-
         let docking;
         try {
-            // Same URL Ubuntu Dock imports, so this is its live module instance.
-            docking = await import(dockExtension.dir.get_child('docking.js').get_uri());
+            docking = await importDocking(Main.extensionManager);
         } catch (e) {
             console.error(`[dock-glass] Cannot load ${DOCK_UUID}: ${e}`);
             return;
         }
 
-        if (!this._enabled)
+        if (!docking || !this._enabled)
             return;
         this._docking = docking;
         this._attachManager();
@@ -123,16 +120,13 @@ export default class DockGlassExtension extends Extension {
     }
 
     _attachManager() {
-        const manager = this._docking?.DockManager.getDefault() ?? null;
+        const manager = getDockManager(this._docking);
         if (manager !== this._manager) {
             this._detachManager();
             this._manager = manager;
-            // DockManager uses JS signals, so plain connect/disconnect is safe.
             if (manager) {
-                this._managerIds = [
-                    manager.connect('docks-ready', () => this._attachDocks()),
-                    manager.connect('docks-destroyed', () => this._detachDocks()),
-                ];
+                this._disconnectManager = connectDockManager(manager,
+                    () => this._attachDocks(), () => this._detachDocks());
             }
         }
         this._attachDocks();
@@ -140,14 +134,14 @@ export default class DockGlassExtension extends Extension {
 
     _detachManager() {
         this._detachDocks();
-        this._managerIds.forEach(id => this._manager.disconnect(id));
-        this._managerIds = [];
+        this._disconnectManager?.();
+        this._disconnectManager = null;
         this._manager = null;
     }
 
     _attachDocks() {
-        for (const dock of this._manager?._allDocks ?? []) {
-            const box = dock.dash?._box;
+        for (const dock of getDocks(this._manager)) {
+            const box = dock.itemBox;
             if (!box || this._boxes.has(box))
                 continue;
 
@@ -155,7 +149,7 @@ export default class DockGlassExtension extends Extension {
             box.connectObject(
                 'child-added', (_box, item) => {
                     this._trackButton(item.child, dock);
-                    if (item === dock.dash._separator)
+                    if (item === dock.separator)
                         this._queueSeparatorMove(dock);
                     this._wakeMagnifier(dock);
                 },
@@ -168,9 +162,9 @@ export default class DockGlassExtension extends Extension {
             // Pointer motion over the dock starts or restarts the magnifier,
             // and leaving it lets the magnifier notice and fade out. Clutter
             // only routes events through reactive actors, so this listens on
-            // dashtodockBox (reactive, hover-tracked, covering the whole dock)
-            // rather than the non-reactive dock container.
-            dock._box?.connectObject(
+            // the dock's frame (reactive, hover-tracked, covering the whole
+            // dock) rather than the non-reactive dock container.
+            dock.frame?.connectObject(
                 'motion-event', () => {
                     this._wakeMagnifier(dock);
                     return Clutter.EVENT_PROPAGATE;
@@ -180,24 +174,23 @@ export default class DockGlassExtension extends Extension {
             for (const item of box.get_children())
                 this._trackButton(item.child, dock);
 
-            const showApps = dock.dash._showAppsIcon;
-            this._trackButton(showApps?.toggleButton, dock, showApps?.icon);
+            this._trackButton(dock.showAppsButton, dock, dock.showAppsIcon);
 
             // Only bottom (horizontal) docks magnify; leave the others as is.
-            if (!dock.dash._isHorizontal)
+            if (!dock.isHorizontal)
                 continue;
 
             // Spread icons reach past the scroll view, which clips to its
             // allocation by default; the pill scales around its center.
-            const scroller = dock.dash._boxContainer;
+            const scroller = dock.scroller;
             this._clipToView = scroller?.clip_to_view ?? true;
             if (scroller)
                 scroller.clip_to_view = false;
-            dock.dash._background?.set_pivot_point(0.5, 0.5);
+            dock.background?.set_pivot_point(0.5, 0.5);
 
             // The slide container clips the dock (glass included) to the pill
             // at rest on every allocation; widen that clip sideways each time.
-            dock._box?.connectObject('notify::clip-rect', () => this._widenClip(dock), this);
+            dock.frame?.connectObject('notify::clip-rect', () => this._widenClip(dock), this);
             this._widenClip(dock);
             this._queueSeparatorMove(dock);
         }
@@ -219,8 +212,8 @@ export default class DockGlassExtension extends Extension {
     }
 
     _moveSeparatorBeforeFiles(dock) {
-        const box = dock.dash?._box;
-        const separator = dock.dash?._separator;
+        const box = dock.itemBox;
+        const separator = dock.separator;
         if (!this._boxes.has(box) || !separator || separator.get_parent() !== box)
             return;
 
@@ -236,8 +229,8 @@ export default class DockGlassExtension extends Extension {
 
     // The exact inverse, only if the last redisplay's separator was moved.
     _restoreSeparator(dock) {
-        const box = dock.dash._box;
-        const separator = dock.dash._separator;
+        const box = dock.itemBox;
+        const separator = dock.separator;
         const next = separator?.get_next_sibling();
         if (this._separatorMoved.get(dock) && separator.get_parent() === box &&
             next?.child?.app?.get_id() === FILES_APP_ID)
@@ -264,18 +257,18 @@ export default class DockGlassExtension extends Extension {
                 // item may be gone already (a destroyed item's label is null).
                 if (!item.label)
                     return;
-                dock.dash._itemMenuStateChanged?.(item, false);
+                dock.setItemMenuOpen(item, false);
                 item.child?.sync_hover?.();
                 item.hideLabel?.();
                 this._wakeMagnifier(dock);
             },
         });
-        dock.dash._itemMenuStateChanged?.(item, true);
+        dock.setItemMenuOpen(item, true);
         this._stack = stack;
         if (stack.open())
             return true;
         this._stack = null;
-        dock.dash._itemMenuStateChanged?.(item, false);
+        dock.setItemMenuOpen(item, false);
         return false;
     }
 
@@ -289,7 +282,7 @@ export default class DockGlassExtension extends Extension {
     }
 
     _widenClip(dock) {
-        const box = dock._box;
+        const box = dock.frame;
         if (!box?.has_clip)
             return;
 
@@ -314,17 +307,16 @@ export default class DockGlassExtension extends Extension {
 
         for (const [box, dock] of this._boxes) {
             box.disconnectObject(this);
-            dock._box?.disconnectObject(this);
-            // The slide container sets its own clip again on relayout.
+            dock.frame?.disconnectObject(this);
             if (this._clips.has(dock))
-                dock._slider?.queue_relayout();
-            if (dock.dash?._isHorizontal && dock.dash._boxContainer)
-                dock.dash._boxContainer.clip_to_view = this._clipToView;
-            if (dock.dash?._separator) {
-                dock.dash._separator.translation_x = 0;
+                dock.restoreClip();
+            if (dock.isHorizontal && dock.scroller)
+                dock.scroller.clip_to_view = this._clipToView;
+            if (dock.separator) {
+                dock.separator.translation_x = 0;
                 this._restoreSeparator(dock);
             }
-            const background = dock.dash?._background;
+            const background = dock.background;
             if (background) {
                 background.scale_x = 1;
                 background.translation_x = 0;
@@ -442,13 +434,13 @@ export default class DockGlassExtension extends Extension {
             // No magnification with animations disabled, on a destroyed dock,
             // or on a vertical dock (the stylesheet only styles bottom docks).
             if (!St.Settings.get().enable_animations ||
-                !this._boxes.has(dock.dash?._box) || !dock.dash._isHorizontal)
+                !this._boxes.has(dock.itemBox) || !dock.isHorizontal)
                 return;
 
             // Ticks every frame while the magnification changes; it stops once
             // settled under a still pointer and restarts on pointer motion.
             const timeline = new Clutter.Timeline({
-                actor: dock.dash._box,
+                actor: dock.itemBox,
                 duration: 1000,
                 repeat_count: -1,
             });
@@ -542,7 +534,7 @@ export default class DockGlassExtension extends Extension {
                 }
             }
 
-            const background = dock.dash._background;
+            const background = dock.background;
             const width = rest.end - rest.start;
             const pillScale = width > 0 ? (layout.end - layout.start) / width : 1;
             const pillShift = (layout.start + layout.end - rest.start - rest.end) / 2;
@@ -571,8 +563,7 @@ export default class DockGlassExtension extends Extension {
     // count), the pill's ends, and the dash's top. Transforms this extension
     // adds are undone, so the magnifier never feeds on its own output.
     _restLayout(dock) {
-        const {dash} = dock;
-        const background = dash._background;
+        const background = dock.background;
         // GNOME reports NaN positions for actors that were never allocated,
         // as happens while the dock fills up at startup; skip those.
         const buttons = [];
@@ -592,13 +583,13 @@ export default class DockGlassExtension extends Extension {
 
         const steps = centers.slice(1).map((center, i) => center - centers[i])
             .filter(step => step > 0);
-        const [dashX, dashY] = dash.get_transformed_position();
+        const [dashX, dashY] = dock.dash.get_transformed_position();
         const start = dashX + background.x;
         if (!background.has_allocation() || !Number.isFinite(start) || !Number.isFinite(dashY))
             return null;
 
         // The line between favorites and running apps moves with the spread.
-        let separator = dash._separator;
+        let separator = dock.separator;
         let separatorCenter = NaN;
         if (separator?.visible && separator.has_allocation()) {
             const [x] = separator.get_transformed_position();
@@ -621,12 +612,12 @@ export default class DockGlassExtension extends Extension {
 
     // Tracked buttons of a dock in on-screen order, Show Apps included.
     _dockButtons(dock) {
-        const buttons = dock.dash._box.get_children()
+        const buttons = dock.itemBox.get_children()
             .map(item => item.child)
             .filter(button => this._buttons.has(button));
-        const showApps = dock.dash._showAppsIcon?.toggleButton;
+        const showApps = dock.showAppsButton;
         if (this._buttons.has(showApps)) {
-            if (this._manager?.settings?.showAppsAtTop)
+            if (dock.showAppsAtTop)
                 buttons.unshift(showApps);
             else
                 buttons.push(showApps);
@@ -663,10 +654,7 @@ export default class DockGlassExtension extends Extension {
                 bounce.active = false;
         }, clone);
         // Stop at once if the dock starts hiding, so the clone never floats alone.
-        dock._slider?.connectObject('notify::slide-x', () => {
-            if (dock._slider.slideX < 1)
-                this._stopBounce(button, true);
-        }, clone);
+        dock.connectHiding(() => this._stopBounce(button, true), clone);
         bounce.timeoutId = GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,
             BOUNCE_TIMEOUT_S, () => {
                 bounce.timeoutId = 0;
