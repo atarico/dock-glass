@@ -143,16 +143,16 @@ export default class DockGlassExtension extends Extension {
                 },
                 this);
             // Pointer motion over the dock starts or restarts the magnifier,
-            // and leaving it lets the magnifier notice and fade out.
-            dock.connectObject(
+            // and leaving it lets the magnifier notice and fade out. Clutter
+            // only routes events through reactive actors, so this listens on
+            // dashtodockBox (reactive, hover-tracked, covering the whole dock)
+            // rather than the non-reactive dock container.
+            dock._box?.connectObject(
                 'motion-event', () => {
                     this._wakeMagnifier(dock);
                     return Clutter.EVENT_PROPAGATE;
                 },
-                'leave-event', () => {
-                    this._wakeMagnifier(dock);
-                    return Clutter.EVENT_PROPAGATE;
-                },
+                'notify::hover', () => this._wakeMagnifier(dock),
                 this);
             for (const item of box.get_children())
                 this._trackButton(item.child, dock);
@@ -198,14 +198,14 @@ export default class DockGlassExtension extends Extension {
     _detachDocks() {
         for (const [box, dock] of this._boxes) {
             box.disconnectObject(this);
-            dock.disconnectObject(this);
-            if (this._clips.has(dock)) {
-                dock._box.disconnectObject(this);
-                // The slide container sets its own clip again on relayout.
+            dock._box?.disconnectObject(this);
+            // The slide container sets its own clip again on relayout.
+            if (this._clips.has(dock))
                 dock._slider?.queue_relayout();
-            }
             if (dock.dash?._isHorizontal && dock.dash._boxContainer)
                 dock.dash._boxContainer.clip_to_view = this._clipToView;
+            if (dock.dash?._separator)
+                dock.dash._separator.translation_x = 0;
             const background = dock.dash?._background;
             if (background) {
                 background.scale_x = 1;
@@ -348,6 +348,7 @@ export default class DockGlassExtension extends Extension {
         if (rest) {
             const layout = magnify({
                 centers: rest.centers,
+                separators: rest.separator ? [rest.separatorCenter] : [],
                 pointer: magnifier.pointer ?? pointerX,
                 radius: MAGNIFY_RADIUS_SLOTS * rest.slot,
                 peak: MAGNIFY_PEAK,
@@ -361,8 +362,9 @@ export default class DockGlassExtension extends Extension {
                 const {icon} = this._buttons.get(button);
                 const {scale, shift} = layout.icons[index];
                 // Skip invisible changes so a still pointer lets the dock settle.
-                if (fadedOut || Math.abs(icon.scale_x - scale) > 0.0005 ||
-                    Math.abs(button.translation_x - shift) > 0.05) {
+                // Written as !(<=) so a broken (NaN) value always counts as changed.
+                if (fadedOut || !(Math.abs(icon.scale_x - scale) <= 0.0005) ||
+                    !(Math.abs(button.translation_x - shift) <= 0.05)) {
                     icon.set_scale(scale, scale);
                     button.translation_x = shift;
                     changed = true;
@@ -370,12 +372,20 @@ export default class DockGlassExtension extends Extension {
                 this._bounces.get(button)?.follow();
             });
 
+            if (rest.separator) {
+                const [shift] = layout.separators;
+                if (fadedOut || !(Math.abs(rest.separator.translation_x - shift) <= 0.05)) {
+                    rest.separator.translation_x = shift;
+                    changed = true;
+                }
+            }
+
             const background = dock.dash._background;
             const width = rest.end - rest.start;
             const pillScale = width > 0 ? (layout.end - layout.start) / width : 1;
             const pillShift = (layout.start + layout.end - rest.start - rest.end) / 2;
-            if (fadedOut || Math.abs(background.scale_x - pillScale) > 0.0005 ||
-                Math.abs(background.translation_x - pillShift) > 0.05) {
+            if (fadedOut || !(Math.abs(background.scale_x - pillScale) <= 0.0005) ||
+                !(Math.abs(background.translation_x - pillShift) <= 0.05)) {
                 background.scale_x = pillScale;
                 background.translation_x = pillShift;
                 changed = true;
@@ -401,21 +411,45 @@ export default class DockGlassExtension extends Extension {
     _restLayout(dock) {
         const {dash} = dock;
         const background = dash._background;
-        const buttons = this._dockButtons(dock).filter(button => button.visible);
+        // GNOME reports NaN positions for actors that were never allocated,
+        // as happens while the dock fills up at startup; skip those.
+        const buttons = [];
+        const centers = [];
+        for (const button of this._dockButtons(dock)) {
+            if (!button.visible || !button.has_allocation())
+                continue;
+            const [x] = button.get_transformed_position();
+            const center = x - button.translation_x + button.width / 2;
+            if (!Number.isFinite(center))
+                continue;
+            buttons.push(button);
+            centers.push(center);
+        }
         if (!background || !buttons.length)
             return null;
 
-        const centers = buttons.map(button => {
-            const [x] = button.get_transformed_position();
-            return x - button.translation_x + button.width / 2;
-        });
         const steps = centers.slice(1).map((center, i) => center - centers[i])
             .filter(step => step > 0);
         const [dashX, dashY] = dash.get_transformed_position();
         const start = dashX + background.x;
+        if (!background.has_allocation() || !Number.isFinite(start) || !Number.isFinite(dashY))
+            return null;
+
+        // The line between favorites and running apps moves with the spread.
+        let separator = dash._separator;
+        let separatorCenter = NaN;
+        if (separator?.visible && separator.has_allocation()) {
+            const [x] = separator.get_transformed_position();
+            separatorCenter = x - separator.translation_x + separator.width / 2;
+        }
+        if (!Number.isFinite(separatorCenter))
+            separator = null;
+
         return {
             buttons,
             centers,
+            separator,
+            separatorCenter,
             slot: steps.length ? Math.min(...steps) : buttons[0].width,
             start,
             end: start + background.width,

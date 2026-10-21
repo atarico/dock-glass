@@ -88,6 +88,24 @@ test('magnified neighbors never overlap', () => {
     }
 });
 
+test('the separator moves with the spread and never overlaps its neighbors', () => {
+    // Four favorites, the separator in a 13px gap, then four running apps.
+    const GAP = 13;
+    const centers = Array.from({length: 8}, (_, i) => 132 + i * SLOT + (i >= 4 ? GAP : 0));
+    const separator = centers[3] + (SLOT + GAP) / 2;
+    for (let pointer = 100; pointer <= 100 + 8 * SLOT + GAP; pointer += 2) {
+        const layout = magnify({
+            centers, separators: [separator], pointer, radius: RADIUS, peak: PEAK,
+            strength: 1, start: 100, end: 100 + 8 * SLOT + GAP,
+        });
+        const [shift] = layout.separators;
+        const at = separator + shift;
+        const left = centers[3] + layout.icons[3].shift + WIDTH * layout.icons[3].scale / 2;
+        const right = centers[4] + layout.icons[4].shift - WIDTH * layout.icons[4].scale / 2;
+        assert.ok(at > left && at < right, `separator overlaps an icon at pointer ${pointer}`);
+    }
+});
+
 test('the pill widens to keep every magnified icon inside it', () => {
     const rest = dock(8);
     for (let pointer = rest.start; pointer <= rest.end; pointer += 2) {
@@ -114,6 +132,21 @@ test('a zero radius (tiles not allocated yet) leaves every icon at rest', () => 
     assert.equal(scaleAt(0, 0, PEAK, 1), 1);
     assert.equal(scaleAt(SLOT, 0, PEAK, 1), 1);
     assert.equal(displacementAt(SLOT, 0, PEAK, 1), 0);
+});
+
+test('an unknown position (an icon not allocated yet) leaves it at rest', () => {
+    // GNOME reports NaN positions for actors that were never allocated.
+    for (const strength of [0, 0.5, 1]) {
+        assert.equal(scaleAt(NaN, RADIUS, PEAK, strength), 1);
+        assert.equal(displacementAt(NaN, RADIUS, PEAK, strength), 0);
+    }
+    const {centers, start, end} = dock(4);
+    centers[1] = NaN;
+    const {icons} = magnify({centers, pointer: 200, radius: RADIUS, peak: PEAK, strength: 0, start, end});
+    for (const icon of icons) {
+        assert.equal(icon.scale, 1);
+        assert.equal(icon.shift, 0);
+    }
 });
 
 test('smoothing is frame-rate independent', () => {

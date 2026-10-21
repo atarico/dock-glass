@@ -4,9 +4,11 @@
 // and out (0 is exactly the rest layout).
 
 // 1 under the pointer, easing along half a cosine wave to 0 at `radius`.
-// A zero radius (tiles not allocated yet) means no magnification at all.
+// A zero radius or an unknown distance (tiles not allocated yet, which GNOME
+// reports as NaN positions) means no magnification at all.
 export function falloff(distance, radius) {
-    const t = radius > 0 ? Math.min(Math.abs(distance) / radius, 1) : 1;
+    const t = radius > 0 && Number.isFinite(distance)
+        ? Math.min(Math.abs(distance) / radius, 1) : 1;
     return (1 + Math.cos(Math.PI * t)) / 2;
 }
 
@@ -32,14 +34,18 @@ export function displacementAt(offset, radius, peak, strength) {
     return offset < 0 ? -spread : spread;
 }
 
-// Scale and horizontal shift of each icon centered at `centers`, plus the
-// pill's new `start` and `end`, which widen with the icons.
-export function magnify({centers, pointer, radius, peak, strength, start, end}) {
+// Scale and horizontal shift of each icon centered at `centers`, the shift
+// of each separator centered at `separators` (they move with the spread but
+// do not grow), plus the pill's new `start` and `end`, which widen with the
+// icons.
+export function magnify({centers, separators = [], pointer, radius, peak, strength, start, end}) {
     return {
         icons: centers.map(center => ({
             scale: scaleAt(center - pointer, radius, peak, strength),
             shift: displacementAt(center - pointer, radius, peak, strength),
         })),
+        separators: separators.map(center =>
+            displacementAt(center - pointer, radius, peak, strength)),
         start: start + displacementAt(start - pointer, radius, peak, strength),
         end: end + displacementAt(end - pointer, radius, peak, strength),
     };
