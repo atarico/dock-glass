@@ -110,6 +110,12 @@ test('zero strength is exactly the rest layout', () => {
     assert.equal(end, 100 + 8 * SLOT);
 });
 
+test('a zero radius (tiles not allocated yet) leaves every icon at rest', () => {
+    assert.equal(scaleAt(0, 0, PEAK, 1), 1);
+    assert.equal(scaleAt(SLOT, 0, PEAK, 1), 1);
+    assert.equal(displacementAt(SLOT, 0, PEAK, 1), 0);
+});
+
 test('smoothing is frame-rate independent', () => {
     const twoFrames = approach(approach(0, 1, 8, 80), 1, 8, 80);
     assert.ok(Math.abs(twoFrames - approach(0, 1, 16, 80)) < 1e-12);

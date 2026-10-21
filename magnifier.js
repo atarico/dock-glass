@@ -4,8 +4,9 @@
 // and out (0 is exactly the rest layout).
 
 // 1 under the pointer, easing along half a cosine wave to 0 at `radius`.
+// A zero radius (tiles not allocated yet) means no magnification at all.
 export function falloff(distance, radius) {
-    const t = Math.min(Math.abs(distance) / radius, 1);
+    const t = radius > 0 ? Math.min(Math.abs(distance) / radius, 1) : 1;
     return (1 + Math.cos(Math.PI * t)) / 2;
 }
 
