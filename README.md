@@ -130,7 +130,7 @@ The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer
 node --test
 ```
 
-The same run also checks that the modules at the repository root only import each other and that `metadata.json` is complete. To build the archive that `gnome-extensions install` takes, in `dist/`:
+The same run also checks that the relative imports of the modules at the repository root only point to each other and that `metadata.json` is complete. To build the archive that `gnome-extensions install` takes, in `dist/`:
 
 ```sh
 sh scripts/pack.sh

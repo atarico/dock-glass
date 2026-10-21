@@ -3,8 +3,8 @@
 # Builds dist/<uuid>.shell-extension.zip, the archive that
 # `gnome-extensions install` takes: metadata.json, the stylesheet, the
 # license and every module at the repository root. Tests, docs and tooling
-# stay out. test/package.test.js checks that the root modules only import
-# each other, so nothing they need is left behind.
+# stay out. test/package.test.js checks that the root modules' relative imports
+# only point to each other, so nothing they need is left behind.
 set -eu
 
 cd "$(dirname "$0")/.."

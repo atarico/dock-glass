@@ -130,7 +130,7 @@ La matemática pura y el adaptador del dock no importan nada de GNOME, así que 
 node --test
 ```
 
-La misma ejecución también comprueba que los módulos de la raíz del repositorio solo se importen entre sí y que `metadata.json` esté completo. Para generar en `dist/` el archivo que acepta `gnome-extensions install`:
+La misma ejecución también comprueba que los imports relativos de los módulos de la raíz del repositorio solo apunten entre ellos y que `metadata.json` esté completo. Para generar en `dist/` el archivo que acepta `gnome-extensions install`:
 
 ```sh
 sh scripts/pack.sh

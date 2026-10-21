@@ -16,7 +16,8 @@ test('every relative import between the shipped modules resolves', () => {
     assert.ok(modules.includes('extension.js'));
     for (const name of modules) {
         const source = readFileSync(new URL(name, root), 'utf8');
-        for (const [, path] of source.matchAll(/from\s+'(\.[^']*)'/g)) {
+        // `from './x.js'`, `import './x.js'` and `import('./x.js')`, either quote.
+        for (const [, , path] of source.matchAll(/(?:\bfrom\s+|\bimport\s*\(?\s*)(['"])(\.[^'"]*)\1/g)) {
             assert.match(path, /^\.\/[^/]+\.js$/, `${name} imports ${path}, which is not a root module`);
             assert.ok(existsSync(new URL(path, root)), `${name} imports ${path}, which does not exist`);
         }
