@@ -211,11 +211,10 @@ export class Stack {
             Main.popModal(this._grab);
             this._grab = null;
         }
-        this._onClosed?.();
-
         // Let clicks through while the stack retracts.
         const root = this._root;
         root.reactive = false;
+        this._notifyClosed();
         let pending = this._parts.length;
         if (!pending) {
             root.destroy();
@@ -237,7 +236,8 @@ export class Stack {
         }
     }
 
-    // Closes at once, without animation (used when the dock goes away).
+    // Closes at once, without animation (used when the dock goes away). The
+    // catcher goes first, so a failing callback can never leave it on screen.
     destroy() {
         const wasOpen = !this._closing;
         this._closing = true;
@@ -245,9 +245,18 @@ export class Stack {
             Main.popModal(this._grab);
             this._grab = null;
         }
-        if (wasOpen)
-            this._onClosed?.();
         this._root?.destroy();
+        this._root = null;
+        if (wasOpen)
+            this._notifyClosed();
+    }
+
+    _notifyClosed() {
+        try {
+            this._onClosed?.();
+        } catch (e) {
+            console.error(`[dock-glass] Stack close callback failed: ${e}`);
+        }
     }
 
     _show(items) {

@@ -258,7 +258,11 @@ export default class DockGlassExtension extends Extension {
             onClosed: () => {
                 if (this._stack === stack)
                     this._stack = null;
-                dock.dash?._itemMenuStateChanged?.(item, false);
+                // Ubuntu Dock destroys its docks before docks-destroyed, so the
+                // item may be gone already (a destroyed item's label is null).
+                if (!item.label)
+                    return;
+                dock.dash._itemMenuStateChanged?.(item, false);
                 item.child?.sync_hover?.();
                 item.hideLabel?.();
                 this._wakeMagnifier(dock);
