@@ -1,17 +1,15 @@
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
-// Ubuntu Dock icons, plus a genie effect from the dock icon when a window
-// opens (openAnimation.js).
-// The pill shape and glass border live in stylesheet.css.
+// Ubuntu Dock icons. Like on macOS, windows open with the system animation;
+// the genie belongs to minimize and restore (Magic Lamp).
+// The pill shape lives in stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
-import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {approach, magnify} from './magnifier.js';
-import {OpenAnimation} from './openAnimation.js';
 
 const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
 
@@ -57,15 +55,9 @@ export default class DockGlassExtension extends Extension {
                     this._attachManager();
             }, this);
         this._loadDocking();
-
-        this._openAnimation = new OpenAnimation(window => this._findIconRect(window));
-        this._openAnimation.enable();
     }
 
     disable() {
-        this._openAnimation.disable();
-        this._openAnimation = null;
-
         this._enabled = false;
         if (this._retryId)
             GLib.source_remove(this._retryId);
@@ -228,25 +220,6 @@ export default class DockGlassExtension extends Extension {
         icon.set_scale(1, 1);
         icon.set_pivot_point(0, 0);
         button.translation_x = 0;
-    }
-
-    // Rect of the window's app icon, preferring the dock on the window's monitor.
-    _findIconRect(window) {
-        const app = Shell.WindowTracker.get_default().get_window_app(window);
-        const monitor = Main.layoutManager.monitors[window.get_monitor()];
-        let fallback = null;
-        for (const [button, {icon}] of this._buttons) {
-            if (!app || button.app !== app)
-                continue;
-
-            const [x, y] = icon.get_transformed_position();
-            const [width, height] = icon.get_transformed_size();
-            const rect = {x, y, width, height};
-            if (monitor && x >= monitor.x && x < monitor.x + monitor.width)
-                return rect;
-            fallback ??= rect;
-        }
-        return fallback;
     }
 
     _wakeMagnifier(dock) {
