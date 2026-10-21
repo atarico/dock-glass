@@ -5,6 +5,7 @@
 // The pill shape lives in stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
+import Meta from 'gi://Meta';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -16,7 +17,9 @@ import {Stack, listPlaces} from './stack.js';
 const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
 
 // Stacks. Files opens its places stack only while it has no windows, so a
-// click still focuses or minimizes its windows otherwise.
+// click still focuses or minimizes its windows otherwise. When Files is the
+// last pinned app, the separator moves to its left, grouping it with the
+// Trash on the right side like the folders of the macOS Dock.
 const FILES_APP_ID = 'org.gnome.Nautilus.desktop';
 const FILES_LABELS = {title: 'Archivos', open: 'Abrir Archivos', home: 'Carpeta personal'};
 
@@ -59,6 +62,8 @@ export default class DockGlassExtension extends Extension {
         this._bounces = new Map();
         this._magnifiers = new Map();
         this._clips = new Map();
+        this._separatorLaters = new Map();
+        this._separatorMoved = new Map();
         this._stack = null;
 
         Main.extensionManager.connectObject('extension-state-changed',
@@ -142,6 +147,8 @@ export default class DockGlassExtension extends Extension {
             box.connectObject(
                 'child-added', (_box, item) => {
                     this._trackButton(item.child, dock);
+                    if (item === dock.dash._separator)
+                        this._queueSeparatorMove(dock);
                     this._wakeMagnifier(dock);
                 },
                 'child-removed', () => this._wakeMagnifier(dock),
@@ -184,7 +191,49 @@ export default class DockGlassExtension extends Extension {
             // at rest on every allocation; widen that clip sideways each time.
             dock._box?.connectObject('notify::clip-rect', () => this._widenClip(dock), this);
             this._widenClip(dock);
+            this._queueSeparatorMove(dock);
         }
+    }
+
+    // Ubuntu Dock re-inserts the separator after the pinned apps on every
+    // redisplay; move it once that is done, before the frame is drawn, so it
+    // never visibly jumps. The separator is not an app item, so moving it
+    // does not disturb how the dock diffs its app list.
+    _queueSeparatorMove(dock) {
+        if (this._separatorLaters.has(dock))
+            return;
+        const laters = global.compositor.get_laters();
+        this._separatorLaters.set(dock, laters.add(Meta.LaterType.BEFORE_REDRAW, () => {
+            this._separatorLaters.delete(dock);
+            this._moveSeparatorBeforeFiles(dock);
+            return GLib.SOURCE_REMOVE;
+        }));
+    }
+
+    _moveSeparatorBeforeFiles(dock) {
+        const box = dock.dash?._box;
+        const separator = dock.dash?._separator;
+        if (!this._boxes.has(box) || !separator || separator.get_parent() !== box)
+            return;
+
+        const children = box.get_children();
+        const index = children.indexOf(separator);
+        const previous = children[index - 1];
+        // Not when Files is the only pinned app: a leading separator.
+        const move = index > 1 && previous.child?.app?.get_id() === FILES_APP_ID;
+        if (move)
+            box.set_child_below_sibling(separator, previous);
+        this._separatorMoved.set(dock, move);
+    }
+
+    // The exact inverse, only if the last redisplay's separator was moved.
+    _restoreSeparator(dock) {
+        const box = dock.dash._box;
+        const separator = dock.dash._separator;
+        const next = separator?.get_next_sibling();
+        if (this._separatorMoved.get(dock) && separator.get_parent() === box &&
+            next?.child?.app?.get_id() === FILES_APP_ID)
+            box.set_child_above_sibling(separator, next);
     }
 
     // Returns whether the stack opened.
@@ -250,6 +299,10 @@ export default class DockGlassExtension extends Extension {
     _detachDocks() {
         this._stack?.destroy();
         this._stack = null;
+        const laters = global.compositor.get_laters();
+        for (const id of this._separatorLaters.values())
+            laters.remove(id);
+        this._separatorLaters.clear();
 
         for (const [box, dock] of this._boxes) {
             box.disconnectObject(this);
@@ -259,8 +312,10 @@ export default class DockGlassExtension extends Extension {
                 dock._slider?.queue_relayout();
             if (dock.dash?._isHorizontal && dock.dash._boxContainer)
                 dock.dash._boxContainer.clip_to_view = this._clipToView;
-            if (dock.dash?._separator)
+            if (dock.dash?._separator) {
                 dock.dash._separator.translation_x = 0;
+                this._restoreSeparator(dock);
+            }
             const background = dock.dash?._background;
             if (background) {
                 background.scale_x = 1;
@@ -270,6 +325,7 @@ export default class DockGlassExtension extends Extension {
         }
         this._boxes.clear();
         this._clips.clear();
+        this._separatorMoved.clear();
         for (const dock of [...this._magnifiers.keys()])
             this._stopMagnifier(dock);
         for (const button of [...this._buttons.keys()])
