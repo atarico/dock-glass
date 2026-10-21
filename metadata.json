@@ -1,7 +1,7 @@
 {
   "uuid": "dock-glass@local",
   "name": "Dock Glass",
-  "description": "Makes Ubuntu Dock feel like the macOS Dock: a glass pill, continuous magnification with icons that spread apart, a launch bounce, and a macOS-like stack of places on the Files icon.",
+  "description": "Makes Ubuntu Dock feel like the macOS Dock: a glass pill, continuous magnification with icons that spread apart, a launch bounce, a genie effect from the dock icon when a window opens, and a macOS-like stack of places on the Files icon.",
   "url": "https://github.com/atarico/dock-glass",
   "shell-version": ["46"],
   "version": 1
