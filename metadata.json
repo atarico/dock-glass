@@ -1,0 +1,7 @@
+{
+  "uuid": "dock-glass@local",
+  "name": "Dock Glass",
+  "description": "Pill-shaped glass styling, hover zoom, a launch bounce and a genie open effect for Ubuntu Dock.",
+  "shell-version": ["46"],
+  "version": 1
+}

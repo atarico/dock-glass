@@ -1,0 +1,8 @@
+# Packed extension archives (gnome-extensions pack)
+*.shell-extension.zip
+
+# Compiled settings schemas
+schemas/gschemas.compiled
+
+# Local code index
+.codegraph/

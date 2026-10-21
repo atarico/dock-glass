@@ -1,0 +1,33 @@
+/* Pill-shaped glass background for Ubuntu Dock at the bottom of the screen.
+ * St reduces oversized radii to half the actor's height, which yields a pill.
+ * Ubuntu Dock sets background and border colors inline, which win over any
+ * stylesheet rule, so the light rim is drawn as an inset shadow instead. */
+#dashtodockContainer.bottom #dash .dash-background,
+#dashtodockContainer.bottom.shrink #dash .dash-background {
+  border-radius: 999px !important;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
+  /* Matches the extra tile padding below, so the pill keeps its height. */
+  margin-top: 18px !important;
+}
+
+/* Headroom for the hovered icon (1.4x plus a 12px lift in extension.js).
+ * Tiles are 18px taller than Ubuntu Dock's 10px top padding, and the
+ * background margin above pushes the pill back down, so the hovered icon
+ * rises above the pill like on macOS instead of being clipped. */
+#dashtodockContainer.bottom #dash .dash-item-container .overview-tile,
+#dashtodockContainer.bottom #dash .dash-item-container .show-apps {
+  padding-top: 28px !important;
+}
+
+/* No highlight square behind dock icons on hover, press or window focus:
+ * the icon zoom and lift from extension.js are the hover feedback, and the
+ * running dots mark open apps. A focused square would also be clipped by the
+ * dock at the hover zoom. Keyboard focus keeps the theme's ring. */
+#dashtodockContainer #dash .dash-item-container .overview-tile.focused .overview-icon,
+#dashtodockContainer #dash .dash-item-container .overview-tile:hover .overview-icon,
+#dashtodockContainer #dash .dash-item-container .overview-tile:active .overview-icon,
+#dashtodockContainer #dash .dash-item-container .show-apps:hover .overview-icon,
+#dashtodockContainer #dash .dash-item-container .show-apps:active .overview-icon,
+#dashtodockContainer #dash .dash-item-container .show-apps:checked .overview-icon {
+  background-color: transparent !important;
+}
