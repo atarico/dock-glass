@@ -2,6 +2,8 @@
 
 **English** · [Español](README.es.md)
 
+[![CI](https://github.com/atarico/dock-glass/actions/workflows/ci.yml/badge.svg)](https://github.com/atarico/dock-glass/actions/workflows/ci.yml)
+
 A GNOME Shell extension that makes Ubuntu Dock feel like the macOS Dock: a glass pill, icons that magnify continuously and spread apart under the pointer, a launch bounce, windows that open with a genie effect from their dock icon, and a macOS-like stack of places that springs out of the Files icon.
 
 > [!NOTE]
@@ -119,12 +121,22 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | `stack.js` | The stack popup: actors, animations, input |
 | `stackLayout.js` | Pure stack layout math |
 | `stylesheet.css` | Pill, headroom, running dot and stack styles |
+| `scripts/pack.sh` | Builds the installable zip |
+| `.github/workflows/ci.yml` | Tests, syntax check and packing on GitHub Actions, plus releases on `v*` tags |
 
 The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer can test them from the repository root:
 
 ```sh
 node --test
 ```
+
+The same run also checks that the modules at the repository root only import each other and that `metadata.json` is complete. To build the archive that `gnome-extensions install` takes, in `dist/`:
+
+```sh
+sh scripts/pack.sh
+```
+
+GitHub Actions runs the tests, a syntax check of every module and the packing on every pull request and push to `main`. Pushing a `v*` tag also publishes a GitHub release with the packed zip.
 
 The GNOME Shell side has no automated tests. For development, symlink your clone instead of cloning into the extensions folder:
 
