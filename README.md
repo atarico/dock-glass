@@ -12,17 +12,27 @@ A GNOME Shell extension that turns Ubuntu Dock into a macOS-like dock: a glass p
    gnome-extensions enable dock-glass@local
    ```
 2. Restart GNOME Shell: on X11 press `Alt+F2`, type `r`, press Enter. On Wayland, log out and back in.
-3. Hover over the dock: icons grow toward the pointer, and the one under it rises above the pill.
+3. Hover over the dock: the icon under the pointer grows above the pill, its neighbors grow less and spread apart, and the pill widens to fit them.
 
 After editing any file, restart GNOME Shell again to load the change.
+
+## Tests
+
+The magnifier math lives in `magnifier.js`, which has no GNOME imports, so Node.js 22 or newer can test it:
+
+```sh
+node --test
+```
+
+The GNOME Shell integration has no automated tests; check it by hand after restarting the shell.
 
 ## Features
 
 | Feature | What it does | Where |
 |---------|--------------|-------|
-| Pill shape | Fully rounded dock with a light inner rim | `stylesheet.css` |
-| Continuous magnification | Each frame, icons scale and lift by their distance from the pointer: 1.4x / 12px under it, 0.9x / 6px next to it, 0.8x / 2px two away, 0.7x beyond | `extension.js` |
-| Launch bounce | A dock icon bounces until the launched app shows its window | `extension.js` |
+| Pill shape | Fully rounded dock; the glass's specular edge is the rim | `stylesheet.css` |
+| Continuous magnification | Like the macOS Dock: icons grow from their bottom edge by their distance from the pointer, 1.4x under it and back to rest size three tiles away along a cosine curve. They never shrink, neighbors spread apart instead of overlapping, and the pill widens with them | `magnifier.js`, `extension.js` |
+| Launch bounce | A dock icon bounces until the launched app shows its window, starting from its current magnified size | `extension.js` |
 | Genie open effect | New app windows pour out of their dock icon instead of GNOME's default open animation | `openAnimation.js`, `genieEffect.js` |
 
 ## Requirements
@@ -49,8 +59,8 @@ The full look also depends on settings outside the extension. They are meant to 
 
 ## How it works
 
-- **Headroom.** Ubuntu Dock clips its content. The stylesheet raises the icon tiles' top padding and adds the same top margin to the pill background. The pill keeps its size, and the largest icon has room to rise above it.
-- **Magnification.** A per-dock `Clutter.Timeline` reads the pointer in stage coordinates every frame and maps it to a fractional icon index. That index is interpolated between the scale/lift knots and smoothed. The loop stops once the icons settle and restarts on pointer motion.
+- **Headroom.** Ubuntu Dock clips its content vertically. The stylesheet raises the icon tiles' top padding and adds the same top margin to the pill background. The pill keeps its size, and the largest icon has room to rise above it. Sideways, the extension turns off the scroll view's clip so spread icons stay visible.
+- **Magnification.** A per-dock `Clutter.Timeline` reads the pointer in stage coordinates every frame while it is over the pill. `magnifier.js` turns each icon's distance from the smoothed pointer into a scale, and the extra width of the icons between them into a sideways shift. The extension applies them as transforms: the scale on each icon, the shift on its button (so the running dot follows), and a horizontal scale and shift on the pill background, which Blur My Shell's glass follows. No allocation changes, so the dock's input region, intellihide and minimize targets keep their rest geometry. The loop stops once the icons settle, restarts on pointer motion, and after the pointer leaves it fades out to exactly the rest layout.
 - **Genie on open.** A wrapper around `Main.wm._shouldAnimateActor` skips GNOME's map animation for normal app windows. A `map` handler then adds the genie deform effect. The wrapper restores itself only while it is still outermost, so it chains safely with Burn My Windows and Magic Lamp.
 
 ## License

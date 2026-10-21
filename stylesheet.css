@@ -1,28 +1,30 @@
-/* Pill-shaped glass background for Ubuntu Dock at the bottom of the screen.
+/* Pill-shaped background for Ubuntu Dock at the bottom of the screen.
  * St reduces oversized radii to half the actor's height, which yields a pill.
- * Ubuntu Dock sets background and border colors inline, which win over any
- * stylesheet rule, so the light rim is drawn as an inset shadow instead. */
+ * The background itself stays transparent: Blur My Shell draws the glass in
+ * its shape, and the glass's own specular edge is the rim. extension.js
+ * scales this actor horizontally while icons spread, so it draws nothing
+ * that would stretch. */
 #dashtodockContainer.bottom #dash .dash-background,
 #dashtodockContainer.bottom.shrink #dash .dash-background {
   border-radius: 999px !important;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.28) !important;
   /* Matches the extra tile padding below, so the pill keeps its height. */
-  margin-top: 18px !important;
+  margin-top: 14px !important;
 }
 
-/* Headroom for the hovered icon (1.4x plus a 12px lift in extension.js).
- * Tiles are 18px taller than Ubuntu Dock's 10px top padding, and the
- * background margin above pushes the pill back down, so the hovered icon
- * rises above the pill like on macOS instead of being clipped. */
+/* Headroom for the magnified icon (1.4x, growing from its bottom edge in
+ * extension.js). Tiles are 14px taller than Ubuntu Dock's 10px top padding,
+ * and the background margin above pushes the pill back down, so the
+ * magnified icon rises above the pill like on macOS instead of being
+ * clipped. */
 #dashtodockContainer.bottom #dash .dash-item-container .overview-tile,
 #dashtodockContainer.bottom #dash .dash-item-container .show-apps {
-  padding-top: 28px !important;
+  padding-top: 24px !important;
 }
 
 /* No highlight square behind dock icons on hover, press or window focus:
- * the icon zoom and lift from extension.js are the hover feedback, and the
- * running dots mark open apps. A focused square would also be clipped by the
- * dock at the hover zoom. Keyboard focus keeps the theme's ring. */
+ * like on macOS, the magnification is the hover feedback and the running
+ * dot marks open apps. A focused square would also be clipped by the dock
+ * at the magnified size. Keyboard focus keeps the theme's ring. */
 #dashtodockContainer #dash .dash-item-container .overview-tile.focused .overview-icon,
 #dashtodockContainer #dash .dash-item-container .overview-tile:hover .overview-icon,
 #dashtodockContainer #dash .dash-item-container .overview-tile:active .overview-icon,
