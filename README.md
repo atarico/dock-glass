@@ -1,9 +1,25 @@
 # Dock Glass
 
+**English** · [Español](README.es.md)
+
 A GNOME Shell extension that makes Ubuntu Dock feel like the macOS Dock: a glass pill, icons that magnify continuously and spread apart under the pointer, a launch bounce, windows that open with a genie effect from their dock icon, and a macOS-like stack of places that springs out of the Files icon.
 
 > [!NOTE]
 > **Early project.** Developed and tested on Ubuntu 24.04, GNOME Shell 46 on X11, with Ubuntu Dock at the bottom, 48px icons and the Yaru theme. Values are hardcoded for now; a preferences window is planned. It is not on [extensions.gnome.org](https://extensions.gnome.org) yet.
+
+## See it in action
+
+![Dock icons magnifying and spreading apart under the pointer, with the glass pill refracting the page behind it](docs/media/glass.gif)
+
+*Magnification and the glass pill, on top of Blur My Shell's Liquid Glass (zoomed-in recording).*
+
+![A click on the Files icon fans out the places, which spring back into the icon; a click on Desktop opens it](docs/media/files-stack.gif)
+
+*The Files places stack: folders spring out of the icon, fly back into it when it closes, and open with a click.*
+
+![A window shrinking into its dock icon with a genie effect and coming back out of it](docs/media/minimize-restore.gif)
+
+*Minimize and restore with the Magic Lamp companion extension. Dock Glass aims its genie at the icon's resting place in the dock.*
 
 ## Features
 
