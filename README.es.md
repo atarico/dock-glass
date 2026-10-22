@@ -53,6 +53,8 @@ Para tener también el genio al minimizar y restaurar, se puede agregar [Magic L
 
 Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Para desinstalar, ejecutar `gnome-extensions disable dock-glass@atarico.github.io` y borrar la carpeta.
 
+**Traducciones.** Un clon no trae las traducciones compiladas, así que los textos de la pila se ven en inglés. Para verlos en tu idioma (por ahora, español), ejecutar `sh scripts/build-locale.sh` en esa carpeta, que necesita gettext (`sudo apt install gettext` en Ubuntu), y reiniciar GNOME Shell. Volver a ejecutarlo después de cada `git pull`.
+
 **¿La instalaste como `dock-glass@local`?** Las versiones anteriores usaban ese UUID, y GNOME Shell solo carga una extensión desde una carpeta con el nombre de su UUID. Renombrar la carpeta a `dock-glass@atarico.github.io`, reiniciar GNOME Shell y volver a activarla con el comando de arriba.
 
 ## Configuración recomendada
@@ -94,7 +96,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 ## Limitaciones conocidas
 
 - **Valores fijos.** El tamaño máximo de la magnificación, su alcance y el vidrio son fijos hasta que exista la ventana de preferencias.
-- **Textos de la pila en español.** La pila de lugares muestra "Abrir Archivos" y "Carpeta personal" en español, sea cual sea el idioma del sistema, hasta que la extensión tenga traducciones. Los nombres de las carpetas vienen del sistema.
+- **Traducciones.** Los textos de la pila de lugares están traducidos solo al español; en otros idiomas se ven en inglés. Los nombres de las carpetas vienen del sistema.
 - **Agrupación del separador.** Las aplicaciones abiertas que no están ancladas siguen apareciendo entre Archivos y la Papelera.
 - **Activación con el teclado.** Abrir Archivos desde el teclado (Enter sobre un ícono con foco, o `Super`+número) sin ventanas de Archivos también abre la pila de lugares.
 - **Partes internas del dock.** La extensión se engancha a partes privadas del dock, que Ubuntu Dock y Dash to Dock comparten, así que una actualización del dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
@@ -123,7 +125,9 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | `stack.js` | La ventana emergente de la pila: actores, animaciones, entrada |
 | `stackLayout.js` | Matemática pura de la disposición de la pila |
 | `stylesheet.css` | Estilos de la píldora, el espacio superior, el punto de ejecución y la pila |
-| `scripts/pack.sh` | Genera el zip instalable |
+| `po/` | Traducciones, un `<idioma>.po` por idioma |
+| `scripts/build-locale.sh` | Compila `po/` en `locale/`, donde GNOME Shell las lee |
+| `scripts/pack.sh` | Genera el zip instalable, con las traducciones |
 | `.github/workflows/ci.yml` | Pruebas, verificación de sintaxis y empaquetado en GitHub Actions, más versiones publicadas con etiquetas `v*` |
 
 La matemática pura y el adaptador del dock no importan nada de GNOME, así que Node.js 22 o más nuevo puede probarlos desde la raíz del repositorio:
@@ -132,7 +136,7 @@ La matemática pura y el adaptador del dock no importan nada de GNOME, así que 
 node --test
 ```
 
-La misma ejecución también comprueba que los imports relativos de los módulos de la raíz del repositorio solo apunten entre ellos y que `metadata.json` esté completo. Para generar en `dist/` el archivo que acepta `gnome-extensions install`:
+La misma ejecución también comprueba que los imports relativos de los módulos de la raíz del repositorio solo apunten entre ellos, que `metadata.json` esté completo y que cada archivo de `po/` traduzca exactamente los textos que el código pasa a `_()`. Para generar en `dist/` el archivo que acepta `gnome-extensions install` (necesita gettext):
 
 ```sh
 sh scripts/pack.sh

@@ -53,6 +53,8 @@ For the genie on minimize and restore too, add [Magic Lamp](https://github.com/h
 
 To update, run `git pull` in that folder and restart GNOME Shell. To uninstall, run `gnome-extensions disable dock-glass@atarico.github.io` and delete the folder.
 
+**Translations.** A clone has no compiled translations, so the stack's labels show in English. For your language (Spanish for now), run `sh scripts/build-locale.sh` in that folder, which needs gettext (`sudo apt install gettext` on Ubuntu), and restart GNOME Shell. Run it again after each `git pull`.
+
 **Installed as `dock-glass@local`?** Earlier versions used that UUID, and GNOME Shell only loads an extension from a folder named after its UUID. Rename the folder to `dock-glass@atarico.github.io`, restart GNOME Shell and enable it again with the command above.
 
 ## Recommended setup
@@ -94,7 +96,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 ## Known limitations
 
 - **Hardcoded values.** The magnification peak, its reach and the glass are fixed until the preferences window exists.
-- **Spanish stack labels.** The places stack shows "Abrir Archivos" and "Carpeta personal" until the extension gets translations. Folder names come from your system.
+- **Translations.** The places stack's labels are translated to Spanish only; other languages show them in English. Folder names come from your system.
 - **Separator grouping.** Unpinned running apps still appear between Files and the Trash.
 - **Keyboard activation.** Opening Files from the keyboard (Enter on a focused icon, or `Super`+number) with no Files windows also opens the places stack.
 - **Dock internals.** The extension hooks private parts of the dock, which Ubuntu Dock and Dash to Dock share, so a dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
@@ -123,7 +125,9 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | `stack.js` | The stack popup: actors, animations, input |
 | `stackLayout.js` | Pure stack layout math |
 | `stylesheet.css` | Pill, headroom, running dot and stack styles |
-| `scripts/pack.sh` | Builds the installable zip |
+| `po/` | Translations, one `<language>.po` per language |
+| `scripts/build-locale.sh` | Compiles `po/` into `locale/`, where GNOME Shell reads them |
+| `scripts/pack.sh` | Builds the installable zip, translations included |
 | `.github/workflows/ci.yml` | Tests, syntax check and packing on GitHub Actions, plus releases on `v*` tags |
 
 The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer can test them from the repository root:
@@ -132,7 +136,7 @@ The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer
 node --test
 ```
 
-The same run also checks that the relative imports of the modules at the repository root only point to each other and that `metadata.json` is complete. To build the archive that `gnome-extensions install` takes, in `dist/`:
+The same run also checks that the relative imports of the modules at the repository root only point to each other, that `metadata.json` is complete and that every `po/` file translates exactly the strings the code passes to `_()`. To build the archive that `gnome-extensions install` takes, in `dist/` (needs gettext):
 
 ```sh
 sh scripts/pack.sh
