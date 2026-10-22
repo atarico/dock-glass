@@ -59,9 +59,9 @@ Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Par
 
 ## Configuración recomendada
 
-Dock Glass da estilo y anima al dock de Ubuntu; el aspecto completo también depende de algunos ajustes fuera de la extensión.
+Dock Glass da estilo y anima al dock; el aspecto completo también depende de algunos ajustes fuera de la extensión.
 
-**Ubuntu Dock.** Un fondo transparente (el vidrio lo pone Blur My Shell), un clic que enfoca o minimiza y un solo punto de ejecución:
+**El dock.** Un fondo transparente (el vidrio lo pone Blur My Shell), un clic que enfoca o minimiza y un solo punto de ejecución:
 
 ```sh
 gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'FIXED'
@@ -69,6 +69,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.0
 gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'focus-minimize-or-previews'
 gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'DEFAULT'
 ```
+
+Con Dash to Dock de extensions.gnome.org, configurar esas mismas cuatro opciones en su ventana de preferencias.
 
 **Archivos.** Anclar Archivos como la última aplicación, para que quede junto a la Papelera.
 
@@ -86,12 +88,23 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | Componente | Estado |
 |------------|--------|
 | GNOME Shell 46 | Soportado |
-| Otras versiones de GNOME Shell | Sin probar; `metadata.json` declara solo la 46 |
+| Otras versiones de GNOME Shell | Todavía sin probar; `metadata.json` declara solo la 46 (ver abajo) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Soportado; hace falta uno de los dos docks |
 | Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado, todavía sin probar en vivo; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
 | Posición del dock | Solo abajo; los docks laterales quedan sin cambios |
 | X11 | Probado |
 | Wayland | Sin probar |
+
+### Otras versiones de GNOME y otras distros
+
+Las demás distros usan Dash to Dock, instalado desde extensions.gnome.org. Una versión de GNOME entra en `shell-version` de `metadata.json` solo después de probarla en vivo. Las guías de migración de GNOME 47 a 49 listan un solo cambio que afecta a Dock Glass: la propiedad `vertical` de `St.BoxLayout` (en `stack.js`) está obsoleta desde GNOME 48 en favor de `orientation`, que GNOME 46 no tiene. El resto necesita esa prueba en vivo.
+
+Para probar una versión, usar una máquina virtual (por ejemplo, GNOME Boxes) con una distro que la traiga: Fedora Workstation 41 trae GNOME 47, la 42 trae GNOME 48 y la 43 trae GNOME 49.
+
+1. En la máquina virtual, instalar Dash to Dock desde extensions.gnome.org.
+2. En tu equipo, agregar la versión a `shell-version`, ejecutar `sh scripts/pack.sh` y copiar el zip de `dist/` a la máquina virtual.
+3. Ahí, ejecutar `gnome-extensions install --force dock-glass@atarico.github.io.shell-extension.zip`, cerrar sesión y volver a entrar, y ejecutar `gnome-extensions enable dock-glass@atarico.github.io`.
+4. Usar el dock mientras `journalctl -f -o cat /usr/bin/gnome-shell` corre en una terminal, y buscar errores.
 
 ## Limitaciones conocidas
 
