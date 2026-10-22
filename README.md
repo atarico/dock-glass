@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/atarico/dock-glass/actions/workflows/ci.yml/badge.svg)](https://github.com/atarico/dock-glass/actions/workflows/ci.yml)
 
-A GNOME Shell extension that makes Ubuntu Dock feel like the macOS Dock: a glass pill, icons that magnify continuously and spread apart under the pointer, a launch bounce, windows that open with a genie effect from their dock icon, and a macOS-like stack of places that springs out of the Files icon.
+A GNOME Shell extension that makes Ubuntu Dock or Dash to Dock feel like the macOS Dock: a glass pill, icons that magnify continuously and spread apart under the pointer, a launch bounce, windows that open with a genie effect from their dock icon, and a macOS-like stack of places that springs out of the Files icon.
 
 > [!NOTE]
 > **Early project.** Developed and tested on Ubuntu 24.04, GNOME Shell 46 on X11, with Ubuntu Dock at the bottom, 48px icons and the Yaru theme. Values are hardcoded for now; a preferences window is planned. It is not on [extensions.gnome.org](https://extensions.gnome.org) yet.
@@ -83,8 +83,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 |-----------|--------|
 | GNOME Shell 46 | Supported |
 | Other GNOME Shell versions | Not tested; `metadata.json` declares 46 only |
-| Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Required |
-| Dash to Dock from extensions.gnome.org | Not supported yet |
+| Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Supported; one of the two docks is required |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported, not tested live yet; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
 | Dock position | Bottom only; side docks are left unchanged |
 | X11 | Tested |
 | Wayland | Not tested |
@@ -95,7 +95,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 - **Spanish stack labels.** The places stack shows "Abrir Archivos" and "Carpeta personal" until the extension gets translations. Folder names come from your system.
 - **Separator grouping.** Unpinned running apps still appear between Files and the Trash.
 - **Keyboard activation.** Opening Files from the keyboard (Enter on a focused icon, or `Super`+number) with no Files windows also opens the places stack.
-- **Ubuntu Dock internals.** The extension hooks private parts of Ubuntu Dock, so an Ubuntu Dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
+- **Dock internals.** The extension hooks private parts of the dock, which Ubuntu Dock and Dash to Dock share, so a dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
 
 <details>
 <summary><strong>How it works</strong></summary>
@@ -113,8 +113,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 
 | File | Role |
 |------|------|
-| `extension.js` | Hooks into Ubuntu Dock: magnifier, clips, separator, Files stack, launch bounce |
-| `dockAdapter.js` | The only access to Ubuntu Dock's private internals: loading it, its dock manager and each dock's actors |
+| `extension.js` | Hooks into the dock: magnifier, clips, separator, Files stack, launch bounce |
+| `dockAdapter.js` | The only access to the private internals of Ubuntu Dock and Dash to Dock: loading the dock that runs, its dock manager and each dock's actors |
 | `openAnimation.js` | Replaces the window open animation with the genie |
 | `genieEffect.js` | The genie deform effect |
 | `magnifier.js` | Pure magnification math |
