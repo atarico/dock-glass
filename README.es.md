@@ -131,7 +131,7 @@ Para probar una versión, usar una máquina virtual (por ejemplo, GNOME Boxes) c
 | Archivo | Función |
 |---------|---------|
 | `extension.js` | Se engancha al dock: magnificación, recortes, separador, pila de Archivos, rebote al abrir |
-| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el dock que está corriendo, su administrador de docks y los actores de cada dock |
+| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el módulo de cada dock instalado, cuál está corriendo, su administrador de docks y los actores de cada dock |
 | `openAnimation.js` | Reemplaza la animación de apertura de ventanas por el genio |
 | `genieEffect.js` | El efecto de deformación del genio |
 | `magnifier.js` | Matemática pura de la magnificación |

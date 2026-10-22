@@ -131,7 +131,7 @@ To check a version, use a virtual machine (GNOME Boxes, for example) with a dist
 | File | Role |
 |------|------|
 | `extension.js` | Hooks into the dock: magnifier, clips, separator, Files stack, launch bounce |
-| `dockAdapter.js` | The only access to the private internals of Ubuntu Dock and Dash to Dock: loading the dock that runs, its dock manager and each dock's actors |
+| `dockAdapter.js` | The only access to the private internals of Ubuntu Dock and Dash to Dock: loading the module of every installed dock, finding the one that runs, its dock manager and each dock's actors |
 | `openAnimation.js` | Replaces the window open animation with the genie |
 | `genieEffect.js` | The genie deform effect |
 | `magnifier.js` | Pure magnification math |
