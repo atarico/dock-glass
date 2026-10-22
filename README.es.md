@@ -42,16 +42,18 @@ Para tener también el genio al minimizar y restaurar, se puede agregar [Magic L
 1. Clonar el repositorio en la carpeta de extensiones. El nombre de la carpeta tiene que ser el UUID de la extensión:
    ```sh
    git clone https://github.com/atarico/dock-glass.git \
-     ~/.local/share/gnome-shell/extensions/dock-glass@local
+     ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
    ```
 2. Reiniciar GNOME Shell. En X11, presionar `Alt+F2`, escribir `r` y presionar Enter. En Wayland, cerrar sesión y volver a entrar.
 3. Activarla:
    ```sh
-   gnome-extensions enable dock-glass@local
+   gnome-extensions enable dock-glass@atarico.github.io
    ```
 4. Pasar el puntero sobre el dock: el ícono que está debajo crece por encima de la píldora y sus vecinos se separan.
 
-Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Para desinstalar, ejecutar `gnome-extensions disable dock-glass@local` y borrar la carpeta.
+Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Para desinstalar, ejecutar `gnome-extensions disable dock-glass@atarico.github.io` y borrar la carpeta.
+
+**¿La instalaste como `dock-glass@local`?** Las versiones anteriores usaban ese UUID, y GNOME Shell solo carga una extensión desde una carpeta con el nombre de su UUID. Renombrar la carpeta a `dock-glass@atarico.github.io`, reiniciar GNOME Shell y volver a activarla con el comando de arriba.
 
 ## Configuración recomendada
 
@@ -141,7 +143,7 @@ GitHub Actions ejecuta las pruebas, una verificación de sintaxis de cada módul
 El lado de GNOME Shell no tiene pruebas automáticas. Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
 
 ```sh
-ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@local
+ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
 ```
 
 Reiniciar GNOME Shell después de cada cambio y ver los errores con:

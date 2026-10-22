@@ -42,16 +42,18 @@ For the genie on minimize and restore too, add [Magic Lamp](https://github.com/h
 1. Clone the repository into your extensions folder. The folder name must be the extension's UUID:
    ```sh
    git clone https://github.com/atarico/dock-glass.git \
-     ~/.local/share/gnome-shell/extensions/dock-glass@local
+     ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
    ```
 2. Restart GNOME Shell. On X11 press `Alt+F2`, type `r` and press Enter. On Wayland, log out and back in.
 3. Enable it:
    ```sh
-   gnome-extensions enable dock-glass@local
+   gnome-extensions enable dock-glass@atarico.github.io
    ```
 4. Move the pointer over the dock: the icon under it grows above the pill and its neighbors spread apart.
 
-To update, run `git pull` in that folder and restart GNOME Shell. To uninstall, run `gnome-extensions disable dock-glass@local` and delete the folder.
+To update, run `git pull` in that folder and restart GNOME Shell. To uninstall, run `gnome-extensions disable dock-glass@atarico.github.io` and delete the folder.
+
+**Installed as `dock-glass@local`?** Earlier versions used that UUID, and GNOME Shell only loads an extension from a folder named after its UUID. Rename the folder to `dock-glass@atarico.github.io`, restart GNOME Shell and enable it again with the command above.
 
 ## Recommended setup
 
@@ -141,7 +143,7 @@ GitHub Actions runs the tests, a syntax check of every module and the packing on
 The GNOME Shell side has no automated tests. For development, symlink your clone instead of cloning into the extensions folder:
 
 ```sh
-ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@local
+ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
 ```
 
 Restart GNOME Shell after each change, and watch for errors with:
