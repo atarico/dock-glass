@@ -31,3 +31,21 @@ test('metadata.json has what GNOME Shell needs to load the extension', () => {
     const versions = metadata['shell-version'];
     assert.ok(Array.isArray(versions) && versions.length > 0, 'shell-version');
 });
+
+// https://gjs.guide/extensions/overview/anatomy.html and
+// https://gjs.guide/extensions/review-guidelines/review-guidelines.html
+test('metadata.json follows the extensions.gnome.org rules', () => {
+    const metadata = JSON.parse(readFileSync(new URL('metadata.json', root), 'utf8'));
+    const [id, namespace, ...rest] = metadata.uuid.split('@');
+    assert.equal(rest.length, 0, 'one @ in the uuid');
+    assert.match(id, /^[A-Za-z0-9._-]+$/, 'uuid id');
+    assert.match(namespace, /^[A-Za-z0-9._-]+$/, 'uuid namespace');
+    assert.ok(namespace !== 'local' && !namespace.endsWith('gnome.org'),
+        `${namespace} is not a namespace the author controls`);
+    // extensions.gnome.org sets `version` on upload; `version-name` is shown.
+    assert.equal('version' in metadata, false, 'version');
+    assert.match(metadata['version-name'], /^(?!^[. ]+$)[a-zA-Z0-9 .]{1,16}$/, 'version-name');
+    assert.match(metadata.url, /^https:\/\//, 'url');
+    for (const version of metadata['shell-version'])
+        assert.match(version, /^\d+$/, 'shell-version lists major versions');
+});

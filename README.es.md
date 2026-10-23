@@ -42,22 +42,26 @@ Para tener también el genio al minimizar y restaurar, se puede agregar [Magic L
 1. Clonar el repositorio en la carpeta de extensiones. El nombre de la carpeta tiene que ser el UUID de la extensión:
    ```sh
    git clone https://github.com/atarico/dock-glass.git \
-     ~/.local/share/gnome-shell/extensions/dock-glass@local
+     ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
    ```
 2. Reiniciar GNOME Shell. En X11, presionar `Alt+F2`, escribir `r` y presionar Enter. En Wayland, cerrar sesión y volver a entrar.
 3. Activarla:
    ```sh
-   gnome-extensions enable dock-glass@local
+   gnome-extensions enable dock-glass@atarico.github.io
    ```
 4. Pasar el puntero sobre el dock: el ícono que está debajo crece por encima de la píldora y sus vecinos se separan.
 
-Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Para desinstalar, ejecutar `gnome-extensions disable dock-glass@local` y borrar la carpeta.
+Para actualizar, ejecutar `git pull` en esa carpeta y reiniciar GNOME Shell. Para desinstalar, ejecutar `gnome-extensions disable dock-glass@atarico.github.io` y borrar la carpeta.
+
+**Traducciones.** Un clon no trae las traducciones compiladas, así que los textos de la pila se ven en inglés. Para verlos en tu idioma (por ahora, español), ejecutar `sh scripts/build-locale.sh` en esa carpeta, que necesita gettext (`sudo apt install gettext` en Ubuntu), y reiniciar GNOME Shell. Volver a ejecutarlo después de cada `git pull`.
+
+**¿La instalaste como `dock-glass@local`?** Las versiones anteriores usaban ese UUID, y GNOME Shell solo carga una extensión desde una carpeta con el nombre de su UUID. Renombrar la carpeta a `dock-glass@atarico.github.io`, reiniciar GNOME Shell y volver a activarla con el comando de arriba.
 
 ## Configuración recomendada
 
-Dock Glass da estilo y anima al dock de Ubuntu; el aspecto completo también depende de algunos ajustes fuera de la extensión.
+Dock Glass da estilo y anima al dock; el aspecto completo también depende de algunos ajustes fuera de la extensión.
 
-**Ubuntu Dock.** Un fondo transparente (el vidrio lo pone Blur My Shell), un clic que enfoca o minimiza y un solo punto de ejecución:
+**El dock.** Un fondo transparente (el vidrio lo pone Blur My Shell), un clic que enfoca o minimiza y un solo punto de ejecución:
 
 ```sh
 gsettings set org.gnome.shell.extensions.dash-to-dock transparency-mode 'FIXED'
@@ -65,6 +69,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock background-opacity 0.0
 gsettings set org.gnome.shell.extensions.dash-to-dock click-action 'focus-minimize-or-previews'
 gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'DEFAULT'
 ```
+
+Con Dash to Dock de extensions.gnome.org, configurar esas mismas cuatro opciones en su ventana de preferencias.
 
 **Archivos.** Anclar Archivos como la última aplicación, para que quede junto a la Papelera.
 
@@ -82,17 +88,28 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | Componente | Estado |
 |------------|--------|
 | GNOME Shell 46 | Soportado |
-| Otras versiones de GNOME Shell | Sin probar; `metadata.json` declara solo la 46 |
+| Otras versiones de GNOME Shell | Todavía sin probar; `metadata.json` declara solo la 46 (ver abajo) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Soportado; hace falta uno de los dos docks |
 | Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado, todavía sin probar en vivo; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
 | Posición del dock | Solo abajo; los docks laterales quedan sin cambios |
 | X11 | Probado |
 | Wayland | Sin probar |
 
+### Otras versiones de GNOME y otras distros
+
+Las demás distros usan Dash to Dock, instalado desde extensions.gnome.org. Una versión de GNOME entra en `shell-version` de `metadata.json` solo después de probarla en vivo. Las guías de migración de GNOME 47 a 49 listan un solo cambio que afecta a Dock Glass: la propiedad `vertical` de `St.BoxLayout` (en `stack.js`) está obsoleta desde GNOME 48 en favor de `orientation`, que GNOME 46 no tiene. El resto necesita esa prueba en vivo.
+
+Para probar una versión, usar una máquina virtual (por ejemplo, GNOME Boxes) con una distro que la traiga: Fedora Workstation 41 trae GNOME 47, la 42 trae GNOME 48 y la 43 trae GNOME 49.
+
+1. En la máquina virtual, instalar Dash to Dock desde extensions.gnome.org.
+2. En tu equipo, agregar la versión a `shell-version`, ejecutar `sh scripts/pack.sh` y copiar el zip de `dist/` a la máquina virtual.
+3. Ahí, ejecutar `gnome-extensions install --force dock-glass@atarico.github.io.shell-extension.zip`, cerrar sesión y volver a entrar, y ejecutar `gnome-extensions enable dock-glass@atarico.github.io`.
+4. Usar el dock mientras `journalctl -f -o cat /usr/bin/gnome-shell` corre en una terminal, y buscar errores.
+
 ## Limitaciones conocidas
 
 - **Valores fijos.** El tamaño máximo de la magnificación, su alcance y el vidrio son fijos hasta que exista la ventana de preferencias.
-- **Textos de la pila en español.** La pila de lugares muestra "Abrir Archivos" y "Carpeta personal" en español, sea cual sea el idioma del sistema, hasta que la extensión tenga traducciones. Los nombres de las carpetas vienen del sistema.
+- **Traducciones.** Los textos de la pila de lugares están traducidos solo al español; en otros idiomas se ven en inglés. Los nombres de las carpetas vienen del sistema.
 - **Agrupación del separador.** Las aplicaciones abiertas que no están ancladas siguen apareciendo entre Archivos y la Papelera.
 - **Activación con el teclado.** Abrir Archivos desde el teclado (Enter sobre un ícono con foco, o `Super`+número) sin ventanas de Archivos también abre la pila de lugares.
 - **Partes internas del dock.** La extensión se engancha a partes privadas del dock, que Ubuntu Dock y Dash to Dock comparten, así que una actualización del dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
@@ -114,14 +131,16 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 | Archivo | Función |
 |---------|---------|
 | `extension.js` | Se engancha al dock: magnificación, recortes, separador, pila de Archivos, rebote al abrir |
-| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el dock que está corriendo, su administrador de docks y los actores de cada dock |
+| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el módulo de cada dock instalado, cuál está corriendo, su administrador de docks y los actores de cada dock |
 | `openAnimation.js` | Reemplaza la animación de apertura de ventanas por el genio |
 | `genieEffect.js` | El efecto de deformación del genio |
 | `magnifier.js` | Matemática pura de la magnificación |
 | `stack.js` | La ventana emergente de la pila: actores, animaciones, entrada |
 | `stackLayout.js` | Matemática pura de la disposición de la pila |
 | `stylesheet.css` | Estilos de la píldora, el espacio superior, el punto de ejecución y la pila |
-| `scripts/pack.sh` | Genera el zip instalable |
+| `po/` | Traducciones, un `<idioma>.po` por idioma |
+| `scripts/build-locale.sh` | Compila `po/` en `locale/`, donde GNOME Shell las lee |
+| `scripts/pack.sh` | Genera el zip instalable, con las traducciones |
 | `.github/workflows/ci.yml` | Pruebas, verificación de sintaxis y empaquetado en GitHub Actions, más versiones publicadas con etiquetas `v*` |
 
 La matemática pura y el adaptador del dock no importan nada de GNOME, así que Node.js 22 o más nuevo puede probarlos desde la raíz del repositorio:
@@ -130,7 +149,7 @@ La matemática pura y el adaptador del dock no importan nada de GNOME, así que 
 node --test
 ```
 
-La misma ejecución también comprueba que los imports relativos de los módulos de la raíz del repositorio solo apunten entre ellos y que `metadata.json` esté completo. Para generar en `dist/` el archivo que acepta `gnome-extensions install`:
+La misma ejecución también comprueba que los imports relativos de los módulos de la raíz del repositorio solo apunten entre ellos, que `metadata.json` esté completo y que cada archivo de `po/` traduzca exactamente los textos que el código pasa a `_()`. Para generar en `dist/` el archivo que acepta `gnome-extensions install` (necesita gettext):
 
 ```sh
 sh scripts/pack.sh
@@ -141,7 +160,7 @@ GitHub Actions ejecuta las pruebas, una verificación de sintaxis de cada módul
 El lado de GNOME Shell no tiene pruebas automáticas. Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
 
 ```sh
-ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@local
+ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
 ```
 
 Reiniciar GNOME Shell después de cada cambio y ver los errores con:

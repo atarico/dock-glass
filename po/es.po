@@ -1,0 +1,22 @@
+# Spanish translation of Dock Glass.
+# SPDX-License-Identifier: GPL-3.0-or-later
+msgid ""
+msgstr ""
+"Project-Id-Version: dock-glass\n"
+"PO-Revision-Date: 2026-10-22 00:00+0000\n"
+"Last-Translator: atarico\n"
+"Language-Team: Spanish\n"
+"Language: es\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Files"
+msgstr "Archivos"
+
+msgid "Open Files"
+msgstr "Abrir Archivos"
+
+msgid "Home"
+msgstr "Carpeta personal"

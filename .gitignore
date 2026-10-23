@@ -13,3 +13,6 @@ odd/
 
 # Packed extension built by scripts/pack.sh
 dist/
+
+# Translations compiled by scripts/build-locale.sh for a development install
+locale/

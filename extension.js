@@ -11,7 +11,7 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
-import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
+import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {
     DOCK_UUIDS, connectDockManager, getDockManager, getDocks, importDock, isDockExtension,
@@ -25,7 +25,6 @@ import {Stack, listPlaces} from './stack.js';
 // last pinned app, the separator moves to its left, grouping it with the
 // Trash on the right side like the folders of the macOS Dock.
 const FILES_APP_ID = 'org.gnome.Nautilus.desktop';
-const FILES_LABELS = {title: 'Archivos', open: 'Abrir Archivos', home: 'Carpeta personal'};
 
 // Continuous macOS-like magnification (the math lives in magnifier.js).
 // Icons grow from their bottom edge, neighbors spread apart to make room and
@@ -283,12 +282,15 @@ export default class DockGlassExtension extends Extension {
         return false;
     }
 
+    // The labels are translated here, when the stack opens: po/ holds the
+    // translations, and GNOME Shell loads them from locale/ for the
+    // gettext-domain in metadata.json.
     _openPlaces(dock, button, icon) {
         return this._openStack(dock, button.get_parent(), icon, {
-            title: FILES_LABELS.title,
-            openLabel: FILES_LABELS.open,
+            title: _('Files'),
+            openLabel: _('Open Files'),
             onOpenFolder: () => Object.getPrototypeOf(button).activate.call(button, 1),
-            items: () => listPlaces(FILES_LABELS.home),
+            items: () => listPlaces(_('Home')),
         });
     }
 

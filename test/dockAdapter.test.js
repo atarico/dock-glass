@@ -43,7 +43,7 @@ test('Dash to Dock and Ubuntu Dock count as dock extensions, Dash to Dock first'
     assert.deepEqual(DOCK_UUIDS, [DASH_TO_DOCK, UBUNTU_DOCK]);
     assert.equal(isDockExtension({uuid: DASH_TO_DOCK}), true);
     assert.equal(isDockExtension({uuid: UBUNTU_DOCK}), true);
-    assert.equal(isDockExtension({uuid: 'dock-glass@local'}), false);
+    assert.equal(isDockExtension({uuid: 'dock-glass@atarico.github.io'}), false);
     assert.equal(isDockExtension(null), false);
 });
 

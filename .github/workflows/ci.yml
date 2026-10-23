@@ -34,6 +34,9 @@ jobs:
             node --input-type=module --check < "$file" || { echo "Syntax error in $file"; exit 1; }
           done
 
+      - name: Install gettext
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+
       - name: Pack the extension
         run: sh scripts/pack.sh
 
