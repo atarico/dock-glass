@@ -10,7 +10,9 @@ import Shell from 'gi://Shell';
 import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
+import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 
+import {grabHoldsPointer, shellMajor, verticalBox} from './shellCompat.js';
 import {chooseView, fanSlots, gridLayout, staggerDelay} from './stackLayout.js';
 
 // Fan: 48px icons one step apart, bending right gently (about 70px over a
@@ -147,7 +149,7 @@ export class Stack {
         });
         Main.layoutManager.uiGroup.add_child(this._root);
         this._grab = Main.pushModal(this._root, {actionMode: Shell.ActionMode.POPUP});
-        if (!(this._grab.get_seat_state() & Clutter.GrabState.POINTER)) {
+        if (!grabHoldsPointer(this._grab, Clutter.GrabState)) {
             Main.popModal(this._grab);
             this._grab = null;
             this._root.destroy();
@@ -344,8 +346,9 @@ export class Stack {
 
         // Reactive, so a click on the panel's own background does not reach
         // the catcher behind it and close the stack.
+        const vertical = verticalBox(shellMajor(Config.PACKAGE_VERSION), Clutter.Orientation);
         const panel = new St.BoxLayout({
-            vertical: true,
+            ...vertical,
             reactive: true,
             style_class: 'dock-glass-stack-grid',
         });
@@ -361,11 +364,11 @@ export class Stack {
         header.add_child(open);
         panel.add_child(header);
 
-        const rows = new St.BoxLayout({vertical: true});
+        const rows = new St.BoxLayout({...vertical});
         for (let row = 0; row < layout.rows; row++) {
             const line = new St.BoxLayout();
             for (const item of items.slice(row * layout.columns, (row + 1) * layout.columns)) {
-                const cell = new St.BoxLayout({vertical: true, width: GRID_CELL, height: GRID_CELL});
+                const cell = new St.BoxLayout({...vertical, width: GRID_CELL, height: GRID_CELL});
                 cell.add_child(new St.Icon({
                     gicon: item.gicon,
                     icon_size: GRID_ICON_SIZE,
