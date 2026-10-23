@@ -7,6 +7,7 @@ import {test} from 'node:test';
 
 import {
     DOCK_UUIDS, Dock, connectDockManager, getDockManager, getDocks, importDock, isDockExtension,
+    keepFocusInSync,
 } from '../dockAdapter.js';
 
 const DASH_TO_DOCK = 'dash-to-dock@micxgx.gmail.com';
@@ -177,4 +178,64 @@ test('a dock that is not built yet answers null or false instead of throwing', (
     dock.setItemMenuOpen({}, true);
     dock.restoreClip();
     dock.connectHiding(() => assert.fail('no slider, no hiding'), {});
+});
+
+function fakeAppButton() {
+    const handlers = new Map();
+    let nextId = 1;
+    const app = {
+        connect(signal, handler) {
+            handlers.set(nextId, {signal, handler});
+            return nextId++;
+        },
+        disconnect(id) {
+            handlers.delete(id);
+        },
+        notify(signal) {
+            for (const h of [...handlers.values()].filter(h => h.signal === signal))
+                h.handler();
+        },
+        handlers,
+    };
+    // Shaped like Ubuntu Dock's app icon: focused is recomputed only when
+    // _updateFocusState runs, from the running flag the dock keeps.
+    const button = {
+        app,
+        running: false,
+        focused: false,
+        focusApp: null,
+        _updateFocusState() {
+            this.focused = this.focusApp === this.app && this.running;
+        },
+    };
+    return {app, button};
+}
+
+test('an app icon refreshes its focus once a launch that already took focus ends', () => {
+    const {app, button} = fakeAppButton();
+    keepFocusInSync(button);
+    // Brave's window takes focus while its launch is still starting.
+    button.focusApp = app;
+    button._updateFocusState();
+    assert.equal(button.focused, false);
+    // The launch ends: the dock marks it running on notify::state.
+    button.running = true;
+    app.notify('notify::state');
+    assert.equal(button.focused, true);
+});
+
+test('the focus sync stops on request and skips icons without a focus state', () => {
+    const {app, button} = fakeAppButton();
+    const stop = keepFocusInSync(button);
+    stop();
+    assert.equal(app.handlers.size, 0);
+    button.focusApp = app;
+    button.running = true;
+    app.notify('notify::state');
+    assert.equal(button.focused, false);
+
+    const {app: plainApp} = fakeAppButton();
+    keepFocusInSync({app: plainApp})();
+    assert.equal(plainApp.handlers.size, 0);
+    keepFocusInSync({app: null, _updateFocusState() {}})();
 });

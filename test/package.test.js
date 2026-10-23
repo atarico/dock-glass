@@ -49,3 +49,9 @@ test('metadata.json follows the extensions.gnome.org rules', () => {
     for (const version of metadata['shell-version'])
         assert.match(version, /^\d+$/, 'shell-version lists major versions');
 });
+
+// Each version is listed only after a live check on it (see the README).
+test('metadata.json lists GNOME Shell 46 through 51', () => {
+    const metadata = JSON.parse(readFileSync(new URL('metadata.json', root), 'utf8'));
+    assert.deepEqual(metadata['shell-version'], ['46', '47', '48', '49', '50', '51']);
+});

@@ -15,6 +15,7 @@ import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/ex
 
 import {
     DOCK_UUIDS, connectDockManager, getDockManager, getDocks, importDock, isDockExtension,
+    keepFocusInSync,
 } from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
 import {OpenAnimation} from './openAnimation.js';
@@ -53,6 +54,10 @@ const BOUNCE_HEIGHT_PX = 22;
 const BOUNCE_HALF_DURATION_MS = 260;
 const BOUNCE_TIMEOUT_S = 10;
 
+// After a launch from a stack, the dock stays shown until the new window has
+// poured out of the stack's icon, and at most this long when no window opens.
+const LAUNCH_HOLD_MAX_MS = 3000;
+
 export default class DockGlassExtension extends Extension {
     enable() {
         this._enabled = true;
@@ -68,6 +73,7 @@ export default class DockGlassExtension extends Extension {
         this._separatorLaters = new Map();
         this._separatorMoved = new Map();
         this._stack = null;
+        this._launchHold = null;
 
         Main.extensionManager.connectObject('extension-state-changed',
             (_manager, extension) => {
@@ -250,6 +256,7 @@ export default class DockGlassExtension extends Extension {
     _openStack(dock, item, anchor, params) {
         if (this._stack)
             return false;
+        this._launchHold?.end();
 
         // Holding the dock's menu state keeps it shown under the stack; it is
         // set before the grab, so losing hover to the grab never hides it. The
@@ -259,18 +266,25 @@ export default class DockGlassExtension extends Extension {
         const stack = new Stack({
             ...params,
             anchor,
-            onClosed: () => {
+            onClosed: ({launched}) => {
                 if (this._stack === stack)
                     this._stack = null;
-                // The dock destroys its docks before it tells (docks-destroyed,
-                // or docks-ready for Dash to Dock), so the item may be gone
-                // already (a destroyed item's label is null).
-                if (!item.label)
-                    return;
-                dock.setItemMenuOpen(item, false);
-                item.child?.sync_hover?.();
-                item.hideLabel?.();
-                this._wakeMagnifier(dock);
+                const release = () => {
+                    // The dock destroys its docks before it tells
+                    // (docks-destroyed, or docks-ready for Dash to Dock), so
+                    // the item may be gone already (a destroyed item's label
+                    // is null).
+                    if (!item.label)
+                        return;
+                    dock.setItemMenuOpen(item, false);
+                    item.child?.sync_hover?.();
+                    item.hideLabel?.();
+                    this._wakeMagnifier(dock);
+                };
+                if (launched)
+                    this._holdDockForLaunch(release);
+                else
+                    release();
             },
         });
         dock.setItemMenuOpen(item, true);
@@ -280,6 +294,39 @@ export default class DockGlassExtension extends Extension {
         this._stack = null;
         dock.setItemMenuOpen(item, false);
         return false;
+    }
+
+    // The pointer is over the stack, not the dock, when an entry is chosen, so
+    // releasing the dock at once would let it hide (when a window covers it)
+    // while the new window pours out of the sliding icon. Holds it until the
+    // next window that opens has finished its genie, then calls release.
+    _holdDockForLaunch(release) {
+        let timeoutId = 0;
+        const hold = {
+            end: () => {
+                if (this._launchHold !== hold)
+                    return;
+                this._launchHold = null;
+                global.window_manager.disconnectObject(hold);
+                if (timeoutId)
+                    GLib.source_remove(timeoutId);
+                release();
+            },
+        };
+        this._launchHold = hold;
+        timeoutId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, LAUNCH_HOLD_MAX_MS, () => {
+            timeoutId = 0;
+            hold.end();
+            return GLib.SOURCE_REMOVE;
+        });
+        // Connected after OpenAnimation's own map handler, so the genie is
+        // already attached when this one runs.
+        global.window_manager.connectObject('map', (_wm, actor) => {
+            if (actor.meta_window?.get_window_type() !== Meta.WindowType.NORMAL)
+                return;
+            global.window_manager.disconnectObject(hold);
+            this._openAnimation.whenOpened(actor, hold.end);
+        }, hold);
     }
 
     // The labels are translated here, when the stack opens: po/ holds the
@@ -313,6 +360,7 @@ export default class DockGlassExtension extends Extension {
     _detachDocks() {
         this._stack?.destroy();
         this._stack = null;
+        this._launchHold?.end();
         const laters = global.compositor.get_laters();
         for (const id of this._separatorLaters.values())
             laters.remove(id);
@@ -349,10 +397,11 @@ export default class DockGlassExtension extends Extension {
         if (!button || !icon || this._buttons.has(button))
             return;
 
-        this._buttons.set(button, {icon, dock});
+        this._buttons.set(button, {icon, dock, stopFocusSync: keepFocusInSync(button)});
         icon.set_pivot_point(0.5, 1);
         button.connectObject('destroy', () => {
             this._stopBounce(button, false);
+            this._buttons.get(button).stopFocusSync();
             this._buttons.delete(button);
         }, this);
 
@@ -405,8 +454,9 @@ export default class DockGlassExtension extends Extension {
     }
 
     _untrackButton(button) {
-        const {icon} = this._buttons.get(button);
+        const {icon, stopFocusSync} = this._buttons.get(button);
         this._buttons.delete(button);
+        stopFocusSync();
         this._stopBounce(button, true);
         button.disconnectObject(this);
         delete button.animateLaunch;
