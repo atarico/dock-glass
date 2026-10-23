@@ -32,7 +32,21 @@ printf '[Desktop Entry]\nType=Application\nName=Files\nExec=false\nIcon=system-f
 mkdir -p /run/dbus
 dbus-daemon --system --fork
 gjs /bench/fake-logind.js &
-sleep 1
+# It owns its name within a second; ten seconds means it is not coming.
+logind=no
+for _ in $(seq 20); do
+    if dbus-send --system --print-reply --dest=org.freedesktop.DBus /org/freedesktop/DBus \
+        org.freedesktop.DBus.NameHasOwner string:org.freedesktop.login1 2> /dev/null |
+        grep -q 'boolean true'; then
+        logind=yes
+        break
+    fi
+    sleep 0.5
+done
+if [ "$logind" = no ]; then
+    echo 'The fake logind did not take org.freedesktop.login1 on the system bus' >&2
+    exit 1
+fi
 
 export XDG_RUNTIME_DIR=/tmp/xdg XDG_SESSION_TYPE=wayland
 mkdir -p "$XDG_RUNTIME_DIR"
@@ -48,10 +62,15 @@ dbus-run-session -- sh -c "
     gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed true
     gnome-shell --headless --wayland --no-x11 --virtual-monitor 1920x1080 --force-animations > /tmp/shell.log 2>&1 &
     shell=\$!
+    loaded=no
     for _ in \$(seq 60); do
-        gnome-extensions info dock-glass@atarico.github.io > /dev/null 2>&1 && break
+        gnome-extensions info dock-glass@atarico.github.io > /dev/null 2>&1 && loaded=yes && break
         sleep 1
     done
+    if [ \$loaded = no ]; then
+        echo 'GNOME Shell did not start or did not load Dock Glass within a minute; see shell.log'
+        exit 1
+    fi
     sh /src/scripts/bench/run.sh
     status=\$?
     kill \$shell 2>/dev/null || true
@@ -60,7 +79,16 @@ dbus-run-session -- sh -c "
 " || true
 
 grep -E 'DOCK-GLASS-BENCH|JS ERROR|\[dock-glass\]' /tmp/shell.log || true
+if [ -f "$results/hardware.txt" ]; then
+    echo 'Renderer: llvmpipe (software rendering, no GPU in the container)' >> "$results/hardware.txt"
+fi
+
+# Only the files written here change owner, never the rest of /out.
 cp /tmp/shell.log /out/shell.log
-cp "$results"/* /out/ 2>/dev/null || true
-chown -R "${HOST_UID:-0}:${HOST_GID:-0}" /out
+chown "${HOST_UID:-0}:${HOST_GID:-0}" /out/shell.log
+for file in "$results"/*; do
+    [ -f "$file" ] || continue
+    cp "$file" /out/
+    chown "${HOST_UID:-0}:${HOST_GID:-0}" "/out/$(basename "$file")"
+done
 [ -f /out/result.md ]

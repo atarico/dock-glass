@@ -8,6 +8,7 @@
 set -eu
 
 uuid=dock-glass-bench@atarico.github.io
+timeout_minutes=20
 here=$(cd "$(dirname "$0")" && pwd)
 dest="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$uuid"
 out="${XDG_CACHE_HOME:-$HOME/.cache}/dock-glass-bench"
@@ -24,19 +25,28 @@ if ! gnome-extensions info "$uuid" > /dev/null 2>&1; then
 fi
 
 rm -f "$out/result.md" "$out/result.json" "$out/error.txt"
+# Whatever ends this script (done, failed, Ctrl+C) stops the benchmark. When
+# it ends by itself it has already taken itself off the extension lists, so
+# disabling it here is only for a run still going.
+cleanup() {
+    if gnome-extensions list --enabled 2> /dev/null | grep -qx "$uuid"; then
+        gnome-extensions disable "$uuid" 2> /dev/null || true
+    fi
+    rm -rf "$dest"
+}
+trap cleanup EXIT
+trap 'exit 130' INT TERM HUP
 echo "Running for about seven minutes. Do not touch the mouse or the keyboard."
 gnome-extensions enable "$uuid"
 waited=0
 while [ ! -f "$out/result.md" ] && [ ! -f "$out/error.txt" ]; do
     sleep 5
     waited=$((waited + 5))
-    [ "$waited" -lt 1200 ] || break
+    [ "$waited" -lt $((timeout_minutes * 60)) ] || break
 done
-gnome-extensions disable "$uuid"
-rm -rf "$dest"
 
 if [ ! -f "$out/result.md" ]; then
-    echo "The benchmark failed: $(cat "$out/error.txt" 2>/dev/null || echo 'no result after 20 minutes')"
+    echo "The benchmark failed: $(cat "$out/error.txt" 2> /dev/null || echo "no result after $timeout_minutes minutes")"
     exit 1
 fi
 

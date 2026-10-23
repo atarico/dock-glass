@@ -54,7 +54,7 @@ test('a scenario summary takes the median of each metric across rounds', () => {
         {cpu: 6, fps: 59, cpuPerFrame: 1.0, paintP95: 5},
     ]), {cpu: 6, fps: 59, cpuPerFrame: 1.0, paintP95: 5});
     assert.equal(summarize([]), null);
-    // Nothing painted while idle: no paint time, and it is not a number.
+    // Rounds that measured no paint time (idle reports no CPU per frame).
     const idle = summarize([{cpu: 0.2, fps: 0, cpuPerFrame: NaN, paintP95: NaN},
         {cpu: 0.3, fps: 0, cpuPerFrame: NaN, paintP95: NaN}]);
     assert.equal(idle.cpu, 0.25);

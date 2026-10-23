@@ -16,6 +16,8 @@ import * as Config from 'resource:///org/gnome/shell/misc/config.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
+import {offMonitor, sweepX} from './motion.js';
+import {restoredExtensionLists} from './session.js';
 import {cpuMsPerFrame, cpuPercent, cpuTicks, formatTable, percentile, rssKb, summarize} from './stats.js';
 
 const DOCK_GLASS = 'dock-glass@atarico.github.io';
@@ -35,6 +37,10 @@ const STACKS_PER_ROUND = 4;
 // After Dock Glass turns on or off the dock is rebuilt; let it settle.
 const SETTLE_MS = 4000;
 const STEP_MS = 16;
+// How long to wait for Dock Glass to turn on or off and for the dock to
+// come back, checking every POLL_MS.
+const UNTIL_MS = 15000;
+const POLL_MS = 250;
 
 // Disabling Dock Glass makes GNOME Shell disable and enable again every
 // extension enabled after it, this one included, so the run lives on
@@ -81,7 +87,7 @@ export default class DockGlassBench extends Extension {
             return;
         globalThis[RUNNING] = true;
         globalThis[ABORTED] = false;
-        new Bench(this.path).run()
+        new Bench(this.uuid, this.path).run()
             .catch(e => {
                 console.error(`DOCK-GLASS-BENCH FAIL ${e}\n${e.stack}`);
                 writeResult('error.txt', `${e.message}\n`);
@@ -98,14 +104,18 @@ export default class DockGlassBench extends Extension {
 }
 
 class Bench {
-    constructor(dir) {
+    constructor(uuid, dir) {
+        this._uuid = uuid;
         this._dir = dir;
         this._paints = null;
         this._paintStarts = new Map();
     }
 
     async run() {
-        const enabledList = global.settings.get_strv('enabled-extensions');
+        const saved = {
+            enabled: global.settings.get_strv('enabled-extensions'),
+            disabled: global.settings.get_strv('disabled-extensions'),
+        };
         const backend = global.stage.context?.get_backend?.() ?? Clutter.get_default_backend();
         const seat = backend.get_default_seat();
         this._pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
@@ -130,8 +140,13 @@ class Bench {
             this._write(this._result(phases));
         } finally {
             global.stage.disconnectObject(this);
-            // Puts Dock Glass back as it was, and the list in its order.
-            global.settings.set_strv('enabled-extensions', enabledList);
+            // Both lists as they were, which turns Dock Glass back on or off,
+            // without this benchmark (session.js). The disabled list goes
+            // first, so it never overrides an entry the enabled list gets
+            // back.
+            const lists = restoredExtensionLists(saved, this._uuid);
+            global.settings.set_strv('disabled-extensions', lists.disabled);
+            global.settings.set_strv('enabled-extensions', lists.enabled);
         }
     }
 
@@ -155,10 +170,13 @@ class Bench {
             this);
     }
 
+    // Checks for a stop every POLL_MS, so a long wait ends soon after one.
     async _wait(ms) {
-        await wait(ms);
-        if (globalThis[ABORTED])
-            throw new Error('Stopped: the benchmark was disabled');
+        for (let left = ms; left > 0; left -= POLL_MS) {
+            await wait(Math.min(left, POLL_MS));
+            if (globalThis[ABORTED])
+                throw new Error('Stopped: the benchmark was disabled');
+        }
     }
 
     async _setDockGlass(on) {
@@ -169,20 +187,21 @@ class Bench {
                 Main.extensionManager.disableExtension(DOCK_GLASS);
         }
         await this._until(() => isActive(DOCK_GLASS) === on, `Dock Glass did not turn ${on ? 'on' : 'off'}`);
-        await this._until(() => this._icons().length >= 2, 'The dock did not come back');
+        await this._until(() => this._icons().length >= 2,
+            'The dock did not come back, or it has fewer than two app icons');
         await this._wait(SETTLE_MS);
         const monitor = Main.layoutManager.primaryMonitor;
-        if (this._icons().some(icon => center(icon)[1] > monitor.y + monitor.height)) {
+        if (this._icons().some(icon => offMonitor(center(icon), monitor))) {
             throw new Error('The dock is hidden. Show the desktop (Super+D) so no window covers it, ' +
                 'then run the benchmark again');
         }
     }
 
     async _until(condition, message) {
-        for (let waited = 0; waited < 15000; waited += 250) {
+        for (let waited = 0; waited < UNTIL_MS; waited += POLL_MS) {
             if (condition())
                 return;
-            await this._wait(250);
+            await this._wait(POLL_MS);
         }
         throw new Error(message);
     }
@@ -257,16 +276,10 @@ class Bench {
         await this._moveTo(first, y);
         await this._wait(500);
         const result = await this._measure(async () => {
-            const end = GLib.get_monotonic_time() + SWEEP_S * 1e6;
-            let x = first;
-            let direction = 1;
-            while (GLib.get_monotonic_time() < end) {
-                x += direction * SWEEP_PX_PER_S * STEP_MS / 1000;
-                if (x >= last)
-                    [x, direction] = [last, -1];
-                else if (x <= first)
-                    [x, direction] = [first, 1];
-                this._pointer.notify_absolute_motion(GLib.get_monotonic_time(), x, y);
+            const start = GLib.get_monotonic_time();
+            for (let now = start; now < start + SWEEP_S * 1e6; now = GLib.get_monotonic_time()) {
+                const x = sweepX(first, last, SWEEP_PX_PER_S, (now - start) / 1e6);
+                this._pointer.notify_absolute_motion(now, x, y);
                 await this._wait(STEP_MS);
             }
         });

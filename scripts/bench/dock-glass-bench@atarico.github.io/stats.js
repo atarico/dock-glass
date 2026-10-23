@@ -83,7 +83,7 @@ function memory(values) {
 
 // Markdown table of the summaries by scenario ({without, with} each), and
 // the gnome-shell memory line when rss ({without, with}: MB after each
-// round) is given.
+// round) is given. Paint p95 stays in result.json, to keep the table narrow.
 export function formatTable(scenarios, rss = null) {
     const lines = [
         '| Scenario | CPU without | CPU with | Frames/s without | Frames/s with | CPU per frame without | CPU per frame with |',
