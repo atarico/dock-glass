@@ -11,15 +11,15 @@ Una extensión de GNOME Shell que hace que Ubuntu Dock o Dash to Dock se sientan
 
 ## Así se ve
 
-![Los íconos del dock se agrandan y se separan bajo el puntero, mientras la píldora de vidrio refracta la página que tiene detrás](docs/media/glass.gif)
+https://github.com/user-attachments/assets/bd634c8b-6130-4676-b36d-0bb86aa4d3ca
 
 *La magnificación y la píldora de vidrio, sobre el Liquid Glass de Blur My Shell (grabación con zoom).*
 
-![Un clic en el ícono de Archivos despliega los lugares, que vuelven a entrar en el ícono; un clic en Escritorio lo abre](docs/media/files-stack.gif)
+https://github.com/user-attachments/assets/d73059d8-f738-452c-ac48-0fbdbee42390
 
 *La pila de lugares de Archivos: las carpetas salen del ícono, vuelven a entrar en él al cerrarse y se abren con un clic.*
 
-![Una ventana se encoge hasta su ícono del dock con un efecto genio y vuelve a salir de él](docs/media/minimize-restore.gif)
+https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 
 *Minimizar y restaurar con la extensión complementaria Magic Lamp. Dock Glass dirige su genio al lugar de reposo del ícono en el dock.*
 
