@@ -5,5 +5,5 @@
   "url": "https://github.com/atarico/dock-glass",
   "shell-version": ["46"],
   "gettext-domain": "dock-glass@atarico.github.io",
-  "version-name": "0.1"
+  "version-name": "0.1.1"
 }
