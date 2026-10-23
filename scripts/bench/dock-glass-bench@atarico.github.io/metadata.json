@@ -1,0 +1,7 @@
+{
+  "uuid": "dock-glass-bench@atarico.github.io",
+  "name": "Dock Glass benchmark",
+  "description": "Measures what Dock Glass costs GNOME Shell, with and without it. It runs once, about seven minutes, when enabled; use scripts/bench/run.sh from the Dock Glass repository.",
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
+  "url": "https://github.com/atarico/dock-glass"
+}
