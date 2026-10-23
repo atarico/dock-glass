@@ -49,8 +49,22 @@ function openUri(uri) {
     }
 }
 
+// Reads a whole file without blocking the shell. A local promise instead of
+// Gio._promisify, which would patch Gio.File for every extension.
+function loadContents(file) {
+    return new Promise((resolve, reject) => {
+        file.load_contents_async(null, (source, result) => {
+            try {
+                resolve(source.load_contents_finish(result)[1]);
+            } catch (e) {
+                reject(e);
+            }
+        });
+    });
+}
+
 // Places like the Files sidebar: home, the usual folders, then bookmarks.
-export function listPlaces(homeLabel) {
+export async function listPlaces(homeLabel) {
     const home = GLib.get_home_dir();
     const places = [{
         name: homeLabel,
@@ -75,10 +89,11 @@ export function listPlaces(homeLabel) {
     }
 
     // GTK bookmarks: one "uri [label]" per line, as Files writes them.
-    const bookmarks = GLib.build_filenamev([GLib.get_user_config_dir(), 'gtk-3.0', 'bookmarks']);
+    const bookmarks = Gio.File.new_for_path(
+        GLib.build_filenamev([GLib.get_user_config_dir(), 'gtk-3.0', 'bookmarks']));
     let text = '';
     try {
-        text = new TextDecoder().decode(GLib.file_get_contents(bookmarks)[1]);
+        text = new TextDecoder().decode(await loadContents(bookmarks));
     } catch {
         // No bookmarks file: only the standard places.
     }
