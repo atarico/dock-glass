@@ -15,6 +15,7 @@ import {Extension, gettext as _} from 'resource:///org/gnome/shell/extensions/ex
 
 import {
     DOCK_UUIDS, connectDockManager, getDockManager, getDocks, importDock, isDockExtension,
+    keepFocusInSync,
 } from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
 import {OpenAnimation} from './openAnimation.js';
@@ -349,10 +350,11 @@ export default class DockGlassExtension extends Extension {
         if (!button || !icon || this._buttons.has(button))
             return;
 
-        this._buttons.set(button, {icon, dock});
+        this._buttons.set(button, {icon, dock, stopFocusSync: keepFocusInSync(button)});
         icon.set_pivot_point(0.5, 1);
         button.connectObject('destroy', () => {
             this._stopBounce(button, false);
+            this._buttons.get(button).stopFocusSync();
             this._buttons.delete(button);
         }, this);
 
@@ -405,8 +407,9 @@ export default class DockGlassExtension extends Extension {
     }
 
     _untrackButton(button) {
-        const {icon} = this._buttons.get(button);
+        const {icon, stopFocusSync} = this._buttons.get(button);
         this._buttons.delete(button);
+        stopFocusSync();
         this._stopBounce(button, true);
         button.disconnectObject(this);
         delete button.animateLaunch;

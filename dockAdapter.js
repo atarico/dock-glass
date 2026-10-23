@@ -27,6 +27,20 @@ export async function importDock(extensionManager, uuid) {
     return import(extension.dir.get_child('docking.js').get_uri());
 }
 
+// The dock refreshes an app icon's focused flag when the focused app or the
+// app's windows change, and its running flag when the app's state changes,
+// but focused also depends on running. An app whose launch ends after its
+// window took focus (Brave, with startup notification) stays unfocused, so
+// a click raises it instead of minimizing it. Refresh focused on every state
+// change too, after the dock's own handler. Returns the disconnect function.
+export function keepFocusInSync(button) {
+    const {app} = button;
+    if (!app || typeof button._updateFocusState !== 'function')
+        return () => {};
+    const id = app.connect('notify::state', () => button._updateFocusState());
+    return () => app.disconnect(id);
+}
+
 // The dock manager that runs, from the docking modules by uuid, or null
 // while none has one. Both docks also export their manager from
 // extension.js, but Ubuntu Dock keeps exporting the destroyed one while it
