@@ -3,7 +3,7 @@
   "name": "Dock Glass",
   "description": "Makes Ubuntu Dock or Dash to Dock feel like the macOS Dock: a glass pill, continuous magnification with icons that spread apart, a launch bounce, a genie effect from the dock icon when a window opens, and a macOS-like stack of places on the Files icon.",
   "url": "https://github.com/atarico/dock-glass",
-  "shell-version": ["46"],
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
   "gettext-domain": "dock-glass@atarico.github.io",
   "version-name": "0.1.1"
 }

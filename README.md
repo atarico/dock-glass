@@ -87,8 +87,8 @@ With Dash to Dock from extensions.gnome.org, set the same four options in its pr
 
 | Component | Status |
 |-----------|--------|
-| GNOME Shell 46 | Supported |
-| Other GNOME Shell versions | Not tested yet; `metadata.json` declares 46 only (see below) |
+| GNOME Shell 46 to 51 | Supported; each version checked live (see below) |
+| GNOME Shell 52 and later | Not tested yet; `metadata.json` declares 46 to 51 |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Supported; one of the two docks is required |
 | Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
 | Dock position | Bottom only; side docks are left unchanged |
@@ -97,11 +97,22 @@ With Dash to Dock from extensions.gnome.org, set the same four options in its pr
 
 ### Other GNOME versions and distros
 
-Other distros use Dash to Dock, installed from extensions.gnome.org. A GNOME version goes into `shell-version` in `metadata.json` only after a live check on it. The porting guides for GNOME 47 to 49 list one change that touches Dock Glass: `St.BoxLayout`'s `vertical` (in `stack.js`) is deprecated since GNOME 48 in favor of `orientation`, which GNOME 46 does not have. The rest needs that live check.
+Other distros use Dash to Dock, from their packages or from extensions.gnome.org. A GNOME version goes into `shell-version` in `metadata.json` only after a live check on it. Each listed version was checked on a headless GNOME Shell with a virtual pointer and screenshots, using the dock its distro ships:
 
-To check a version, use a virtual machine (GNOME Boxes, for example) with a distro that ships it: Fedora Workstation 41 has GNOME 47, 42 has GNOME 48 and 43 has GNOME 49.
+| GNOME Shell | Distro | Dock |
+|-------------|--------|------|
+| 46 | Ubuntu 24.04 | Ubuntu Dock |
+| 47 | Ubuntu 24.10 | Ubuntu Dock |
+| 48 | Debian 13 | Dash to Dock |
+| 49 | Fedora 43 | Dash to Dock |
+| 50 | Ubuntu 26.04 | Ubuntu Dock |
+| 51 | Ubuntu 26.10 | Ubuntu Dock |
 
-1. In the virtual machine, install Dash to Dock from extensions.gnome.org.
+Each check covered the magnification, the places stack (fan and grid), launching an app from the dock, the genie on open, and disabling and enabling Dock Glass, with no errors in the log. Two GNOME changes touch Dock Glass, and `shellCompat.js` handles both: GNOME 50 removed `Clutter.Grab.get_seat_state()`, and GNOME 51 removed `St.BoxLayout`'s `vertical` in favor of `orientation`, which GNOME 48 added.
+
+To check a version by hand, use a virtual machine (GNOME Boxes, for example) with a distro that ships it, such as those above.
+
+1. In the virtual machine, if the distro has no Ubuntu Dock, install Dash to Dock from extensions.gnome.org.
 2. On your machine, add the version to `shell-version`, run `sh scripts/pack.sh` and copy the zip from `dist/` into the virtual machine.
 3. There, run `gnome-extensions install --force dock-glass@atarico.github.io.shell-extension.zip`, log out and back in, and run `gnome-extensions enable dock-glass@atarico.github.io`.
 4. Use the dock while `journalctl -f -o cat /usr/bin/gnome-shell` runs in a terminal, and look for errors.
@@ -138,6 +149,7 @@ To check a version, use a virtual machine (GNOME Boxes, for example) with a dist
 | `magnifier.js` | Pure magnification math |
 | `stack.js` | The stack popup: actors, animations, input |
 | `stackLayout.js` | Pure stack layout math |
+| `shellCompat.js` | The differences between GNOME Shell 46 and 51 that Dock Glass handles, as pure functions |
 | `stylesheet.css` | Pill, headroom, running dot and stack styles |
 | `po/` | Translations, one `<language>.po` per language |
 | `scripts/build-locale.sh` | Compiles `po/` into `locale/`, where GNOME Shell reads them |
