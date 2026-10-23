@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
-// Ubuntu Dock icons, a macOS-like places stack (stack.js) for Files, and a
-// genie effect from the dock icon when a window opens (openAnimation.js).
-// Ubuntu Dock's private internals are reached only through dockAdapter.js.
-// The pill shape lives in stylesheet.css.
+// the icons of Ubuntu Dock or Dash to Dock, a macOS-like places stack
+// (stack.js) for Files, and a genie effect from the dock icon when a window
+// opens (openAnimation.js). The dock's private internals are reached only
+// through dockAdapter.js. The pill shape lives in stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
@@ -14,7 +14,7 @@ import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
 import {
-    DOCK_UUID, connectDockManager, getDockManager, getDocks, importDocking, isDockExtension,
+    DOCK_UUIDS, connectDockManager, getDockManager, getDocks, importDock, isDockExtension,
 } from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
 import {OpenAnimation} from './openAnimation.js';
@@ -58,7 +58,7 @@ export default class DockGlassExtension extends Extension {
     enable() {
         this._enabled = true;
         this._retryId = 0;
-        this._docking = null;
+        this._dockModules = new Map();
         this._manager = null;
         this._disconnectManager = null;
         this._boxes = new Map();
@@ -73,9 +73,9 @@ export default class DockGlassExtension extends Extension {
         Main.extensionManager.connectObject('extension-state-changed',
             (_manager, extension) => {
                 if (isDockExtension(extension))
-                    this._attachManager();
+                    this._loadDock(extension.uuid);
             }, this);
-        this._loadDocking();
+        DOCK_UUIDS.forEach(uuid => this._loadDock(uuid));
 
         this._openAnimation = new OpenAnimation(window => this._findIconRect(window));
         this._openAnimation.enable();
@@ -91,26 +91,32 @@ export default class DockGlassExtension extends Extension {
         this._retryId = 0;
         Main.extensionManager.disconnectObject(this);
         this._detachManager();
-        this._docking = null;
+        this._dockModules = null;
     }
 
-    async _loadDocking() {
-        let docking;
-        try {
-            docking = await importDocking(Main.extensionManager);
-        } catch (e) {
-            console.error(`[dock-glass] Cannot load ${DOCK_UUID}: ${e}`);
-            return;
-        }
+    // Imports a dock's live module the first time that dock is seen (one
+    // installed later is seen on its first state change), then follows the
+    // dock manager that runs.
+    async _loadDock(uuid) {
+        if (!this._dockModules.has(uuid)) {
+            let module;
+            try {
+                module = await importDock(Main.extensionManager, uuid);
+            } catch (e) {
+                console.error(`[dock-glass] Cannot load ${uuid}: ${e}`);
+                return;
+            }
 
-        if (!docking || !this._enabled)
-            return;
-        this._docking = docking;
+            if (!module || !this._enabled)
+                return;
+            this._dockModules.set(uuid, module);
+        }
         this._attachManager();
 
         // GNOME enables user extensions before system ones and re-enables them
-        // without extension-state-changed, so retry once if the dock is not up yet.
-        if (!this._manager) {
+        // without extension-state-changed, and a dock that takes over from the
+        // other may start after this runs: retry once if no dock is up yet.
+        if (!this._manager && !this._retryId) {
             this._retryId = GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
                 this._retryId = 0;
                 this._attachManager();
@@ -120,13 +126,17 @@ export default class DockGlassExtension extends Extension {
     }
 
     _attachManager() {
-        const manager = getDockManager(this._docking);
+        const manager = getDockManager(this._dockModules);
         if (manager !== this._manager) {
             this._detachManager();
             this._manager = manager;
             if (manager) {
-                this._disconnectManager = connectDockManager(manager,
-                    () => this._attachDocks(), () => this._detachDocks());
+                this._disconnectManager = connectDockManager(manager, () => {
+                    // Dash to Dock replaces its docks without docks-destroyed,
+                    // so what was attached may be gone: start over.
+                    this._detachDocks();
+                    this._attachDocks();
+                }, () => this._detachDocks());
             }
         }
         this._attachDocks();
@@ -253,8 +263,9 @@ export default class DockGlassExtension extends Extension {
             onClosed: () => {
                 if (this._stack === stack)
                     this._stack = null;
-                // Ubuntu Dock destroys its docks before docks-destroyed, so the
-                // item may be gone already (a destroyed item's label is null).
+                // The dock destroys its docks before it tells (docks-destroyed,
+                // or docks-ready for Dash to Dock), so the item may be gone
+                // already (a destroyed item's label is null).
                 if (!item.label)
                     return;
                 dock.setItemMenuOpen(item, false);

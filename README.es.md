@@ -4,7 +4,7 @@
 
 [![CI](https://github.com/atarico/dock-glass/actions/workflows/ci.yml/badge.svg)](https://github.com/atarico/dock-glass/actions/workflows/ci.yml)
 
-Una extensión de GNOME Shell que hace que el dock de Ubuntu se sienta como el Dock de macOS: una píldora de vidrio, íconos que se agrandan de forma continua y se separan bajo el puntero, un rebote al abrir una aplicación, ventanas que se abren con un efecto genio desde su ícono y una pila de lugares al estilo macOS que sale del ícono de Archivos.
+Una extensión de GNOME Shell que hace que Ubuntu Dock o Dash to Dock se sientan como el Dock de macOS: una píldora de vidrio, íconos que se agrandan de forma continua y se separan bajo el puntero, un rebote al abrir una aplicación, ventanas que se abren con un efecto genio desde su ícono y una pila de lugares al estilo macOS que sale del ícono de Archivos.
 
 > [!NOTE]
 > **Proyecto en etapa temprana.** Desarrollado y probado en Ubuntu 24.04, GNOME Shell 46 sobre X11, con Ubuntu Dock abajo, íconos de 48 px y el tema Yaru. Por ahora los valores son fijos; está prevista una ventana de preferencias. Todavía no está en [extensions.gnome.org](https://extensions.gnome.org).
@@ -83,8 +83,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 |------------|--------|
 | GNOME Shell 46 | Soportado |
 | Otras versiones de GNOME Shell | Sin probar; `metadata.json` declara solo la 46 |
-| Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Requerido |
-| Dash to Dock de extensions.gnome.org | Todavía no soportado |
+| Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Soportado; hace falta uno de los dos docks |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado, todavía sin probar en vivo; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
 | Posición del dock | Solo abajo; los docks laterales quedan sin cambios |
 | X11 | Probado |
 | Wayland | Sin probar |
@@ -95,7 +95,7 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 - **Textos de la pila en español.** La pila de lugares muestra "Abrir Archivos" y "Carpeta personal" en español, sea cual sea el idioma del sistema, hasta que la extensión tenga traducciones. Los nombres de las carpetas vienen del sistema.
 - **Agrupación del separador.** Las aplicaciones abiertas que no están ancladas siguen apareciendo entre Archivos y la Papelera.
 - **Activación con el teclado.** Abrir Archivos desde el teclado (Enter sobre un ícono con foco, o `Super`+número) sin ventanas de Archivos también abre la pila de lugares.
-- **Partes internas de Ubuntu Dock.** La extensión se engancha a partes privadas de Ubuntu Dock, así que una actualización de Ubuntu Dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
+- **Partes internas del dock.** La extensión se engancha a partes privadas del dock, que Ubuntu Dock y Dash to Dock comparten, así que una actualización del dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
 
 <details>
 <summary><strong>Cómo funciona</strong></summary>
@@ -113,8 +113,8 @@ gsettings set org.gnome.shell.extensions.dash-to-dock running-indicator-style 'D
 
 | Archivo | Función |
 |---------|---------|
-| `extension.js` | Se engancha a Ubuntu Dock: magnificación, recortes, separador, pila de Archivos, rebote al abrir |
-| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock: cómo se carga, su administrador de docks y los actores de cada dock |
+| `extension.js` | Se engancha al dock: magnificación, recortes, separador, pila de Archivos, rebote al abrir |
+| `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el dock que está corriendo, su administrador de docks y los actores de cada dock |
 | `openAnimation.js` | Reemplaza la animación de apertura de ventanas por el genio |
 | `genieEffect.js` | El efecto de deformación del genio |
 | `magnifier.js` | Matemática pura de la magnificación |

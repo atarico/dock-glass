@@ -1,36 +1,49 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// The only module that reaches into Ubuntu Dock's private internals: how its
-// live docking module is loaded, its dock manager, and the actors of each
-// dock. Ubuntu Dock (a Dash to Dock fork) keeps them private, so an update
-// can rename them; adapt this file when that happens. The dash item API that
-// GNOME's own dash shares (item.child, button.app, button.icon, item.label,
-// activate...) stays with the code that uses it.
+// The only module that reaches into the dock's private internals: how the
+// dock's live module is loaded, its dock manager, and the actors of each
+// dock. Dash to Dock and Ubuntu Dock (its fork, Ubuntu's default dock) share
+// these internals and keep them private, so an update can rename them; adapt
+// this file when that happens. The dash item API that GNOME's own dash
+// shares (item.child, button.app, button.icon, item.label, activate...)
+// stays with the code that uses it.
 // It has no gi:// or resource:// imports, so node can test the mapping
 // (test/dockAdapter.test.js).
 
-export const DOCK_UUID = 'ubuntu-dock@ubuntu.com';
+// The docks Dock Glass works with, in order of preference. Ubuntu Dock
+// steps aside while Dash to Dock is enabled, so only one of them runs.
+export const DOCK_UUIDS = ['dash-to-dock@micxgx.gmail.com', 'ubuntu-dock@ubuntu.com'];
 
 export function isDockExtension(extension) {
-    return extension?.uuid === DOCK_UUID;
+    return DOCK_UUIDS.includes(extension?.uuid);
 }
 
-// Ubuntu Dock's live docking.js module, or null when Ubuntu Dock is not
+// The dock's live docking.js module, or null when that dock is not
 // installed. Rejects when the module cannot be imported.
-export async function importDocking(extensionManager) {
-    const extension = extensionManager.lookup(DOCK_UUID);
+export async function importDock(extensionManager, uuid) {
+    const extension = extensionManager.lookup(uuid);
     if (!extension)
         return null;
-    // Same URL Ubuntu Dock imports, so this is its live module instance.
+    // Same URL the dock imports, so this is its live module instance.
     return import(extension.dir.get_child('docking.js').get_uri());
 }
 
-// Ubuntu Dock's dock manager, or null while it has none.
-export function getDockManager(docking) {
-    return docking?.DockManager.getDefault() ?? null;
+// The dock manager that runs, from the docking modules by uuid, or null
+// while none has one. Both docks also export their manager from
+// extension.js, but Ubuntu Dock keeps exporting the destroyed one while it
+// steps aside for Dash to Dock; getDefault() is cleared on destroy.
+export function getDockManager(modules) {
+    for (const uuid of DOCK_UUIDS) {
+        const manager = modules.get(uuid)?.DockManager?.getDefault();
+        if (manager)
+            return manager;
+    }
+    return null;
 }
 
 // Calls onReady after the manager (re)creates its docks and onDestroyed after
-// it destroys them. Returns the function that disconnects both.
+// it destroys them. Returns the function that disconnects both. Dash to Dock
+// destroys its docks without docks-destroyed, right before it creates new
+// ones, so after onReady the previous docks may be gone.
 export function connectDockManager(manager, onReady, onDestroyed) {
     // DockManager uses JS signals, so plain connect/disconnect is safe.
     const ids = [
@@ -45,7 +58,7 @@ export function getDocks(manager) {
     return (manager?._allDocks ?? []).map(docked => new Dock(docked, manager));
 }
 
-// One Ubuntu Dock dock (a DockedDash), by the role of each actor. Missing
+// One dock (a DockedDash), by the role of each actor. Missing
 // parts read as null or false, so a dock that is being built or destroyed
 // never throws here.
 export class Dock {
@@ -81,7 +94,7 @@ export class Dock {
         return this._docked.dash?._background ?? null;
     }
 
-    // The line between pinned and running apps. Ubuntu Dock re-inserts it on
+    // The line between pinned and running apps. The dock re-inserts it on
     // every redisplay.
     get separator() {
         return this._docked.dash?._separator ?? null;
