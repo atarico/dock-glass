@@ -115,7 +115,9 @@ export async function listPlaces(homeLabel) {
 
 // One open stack. `items` is a function returning an array or a promise of
 // {name, gicon, uri}, called only once the stack is open; `openLabel` and
-// `onOpenFolder` are the "open in Files" entry on top.
+// `onOpenFolder` are the "open in Files" entry on top. `onClosed({launched})`
+// runs once when the stack closes; launched tells whether an entry was
+// opened.
 export class Stack {
     constructor({anchor, title, openLabel, onOpenFolder, items, onClosed}) {
         this._anchor = anchor;
@@ -180,7 +182,7 @@ export class Stack {
         return true;
     }
 
-    close() {
+    close({launched = false} = {}) {
         if (this._closing)
             return;
         this._closing = true;
@@ -191,7 +193,7 @@ export class Stack {
         // Let clicks through while the stack retracts.
         const root = this._root;
         root.reactive = false;
-        this._notifyClosed();
+        this._notifyClosed(launched);
         const count = this._parts.length;
         let pending = count;
         if (!pending) {
@@ -241,9 +243,9 @@ export class Stack {
             this._notifyClosed();
     }
 
-    _notifyClosed() {
+    _notifyClosed(launched = false) {
         try {
-            this._onClosed?.();
+            this._onClosed?.({launched});
         } catch (e) {
             console.error(`[dock-glass] Stack close callback failed: ${e}`);
         }
@@ -257,7 +259,7 @@ export class Stack {
     }
 
     _launch(action) {
-        this.close();
+        this.close({launched: true});
         action();
     }
 

@@ -99,6 +99,16 @@ export class OpenAnimation {
             actor.remove_effect(effect);
     }
 
+    // Calls done once the genie of a window that just mapped has poured it
+    // out, or at once when the window opens without one.
+    whenOpened(actor, done) {
+        const timeline = actor.get_effect(EFFECT_NAME)?.timeline;
+        if (timeline)
+            timeline.connect('completed', () => done());
+        else
+            done();
+    }
+
     // The icon as drawn right now comes first, so the window pours out of it
     // even while the magnifier has moved or grown it. The window's icon
     // geometry is the rest slot Ubuntu Dock publishes for minimizing; it is
