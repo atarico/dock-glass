@@ -1,0 +1,64 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+# CI: on every pull request and push to main, run the unit tests,
+# syntax-check every module (the GNOME Shell side has no tests) and pack the
+# extension. CD: a pushed v* tag also publishes a GitHub release with that
+# same packed zip.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Tests and package
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Unit tests
+        run: node --test
+
+      - name: Syntax check of every module
+        run: |
+          for file in ./*.js test/*.js; do
+            node --input-type=module --check < "$file" || { echo "Syntax error in $file"; exit 1; }
+          done
+
+      - name: Pack the extension
+        run: sh scripts/pack.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: extension
+          path: dist/*.shell-extension.zip
+          if-no-files-found: error
+
+  release:
+    name: GitHub release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: extension
+          path: dist
+
+      - name: Publish the release with the tested zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" dist/*.shell-extension.zip
+          --repo "$GITHUB_REPOSITORY" --title "$GITHUB_REF_NAME" --generate-notes
