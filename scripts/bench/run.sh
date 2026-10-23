@@ -11,6 +11,8 @@ uuid=dock-glass-bench@atarico.github.io
 timeout_minutes=20
 here=$(cd "$(dirname "$0")" && pwd)
 dest="${XDG_DATA_HOME:-$HOME/.local/share}/gnome-shell/extensions/$uuid"
+# Where the benchmark writes (its extension.js and container/entrypoint.sh
+# name the same).
 out="${XDG_CACHE_HOME:-$HOME/.cache}/dock-glass-bench"
 
 mkdir -p "$(dirname "$dest")"

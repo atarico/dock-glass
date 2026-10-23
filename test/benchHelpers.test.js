@@ -11,31 +11,43 @@ import {restoredExtensionLists} from '../scripts/bench/dock-glass-bench@atarico.
 const BENCH = 'dock-glass-bench@atarico.github.io';
 const DOCK_GLASS = 'dock-glass@atarico.github.io';
 
-test('both extension lists come back as saved, so Dock Glass is on again', () => {
-    // GNOME Shell's disableExtension() also adds the uuid to
-    // disabled-extensions, which overrides enabled-extensions: restoring only
-    // the enabled list left Dock Glass off after every run.
-    assert.deepEqual(restoredExtensionLists({
-        enabled: ['ubuntu-dock@ubuntu.com', DOCK_GLASS, 'other@example.com', BENCH],
-        disabled: [],
-    }, BENCH), {
-        enabled: ['ubuntu-dock@ubuntu.com', DOCK_GLASS, 'other@example.com'],
+// What the benchmark saved before the run, and the lists as it leaves them:
+// it toggled Dock Glass (disableExtension() also adds the uuid to
+// disabled-extensions, which overrides enabled-extensions) and enabled itself.
+const OTHER = 'other@example.com';
+
+test('Dock Glass that was on comes back on, in its place in both lists', () => {
+    const saved = {enabled: ['ubuntu-dock@ubuntu.com', DOCK_GLASS, OTHER, BENCH], disabled: []};
+    const current = {enabled: ['ubuntu-dock@ubuntu.com', OTHER, BENCH], disabled: [DOCK_GLASS]};
+    assert.deepEqual(restoredExtensionLists(saved, current, DOCK_GLASS, BENCH), {
+        enabled: ['ubuntu-dock@ubuntu.com', DOCK_GLASS, OTHER],
         disabled: [],
     });
 });
 
-test('Dock Glass that was off before the run stays off', () => {
-    assert.deepEqual(restoredExtensionLists({
-        enabled: ['ubuntu-dock@ubuntu.com', 'other@example.com', BENCH],
+test('Dock Glass that was off stays off', () => {
+    const saved = {enabled: ['ubuntu-dock@ubuntu.com', OTHER, BENCH], disabled: [DOCK_GLASS]};
+    const current = {enabled: ['ubuntu-dock@ubuntu.com', OTHER, BENCH, DOCK_GLASS], disabled: []};
+    assert.deepEqual(restoredExtensionLists(saved, current, DOCK_GLASS, BENCH), {
+        enabled: ['ubuntu-dock@ubuntu.com', OTHER],
         disabled: [DOCK_GLASS],
-    }, BENCH), {
-        enabled: ['ubuntu-dock@ubuntu.com', 'other@example.com'],
-        disabled: [DOCK_GLASS],
+    });
+});
+
+test('changes to other extensions during the run are kept', () => {
+    const saved = {enabled: [DOCK_GLASS, OTHER, BENCH], disabled: []};
+    // Meanwhile OTHER was turned off and a new one turned on.
+    const current = {enabled: ['new@example.com', BENCH], disabled: [DOCK_GLASS, OTHER]};
+    assert.deepEqual(restoredExtensionLists(saved, current, DOCK_GLASS, BENCH), {
+        enabled: [DOCK_GLASS, 'new@example.com'],
+        disabled: [OTHER],
     });
 });
 
 test('the benchmark leaves both lists, so it never runs again at login', () => {
-    const lists = restoredExtensionLists({enabled: [BENCH, DOCK_GLASS], disabled: [BENCH]}, BENCH);
+    const saved = {enabled: [BENCH, DOCK_GLASS], disabled: []};
+    const current = {enabled: [DOCK_GLASS], disabled: [BENCH]};
+    const lists = restoredExtensionLists(saved, current, DOCK_GLASS, BENCH);
     assert.ok(!lists.enabled.includes(BENCH));
     assert.ok(!lists.disabled.includes(BENCH));
 });

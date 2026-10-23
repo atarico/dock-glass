@@ -73,7 +73,8 @@ function center(actor) {
 
 const isActive = uuid => Main.extensionManager.lookup(uuid)?.state === STATE_ACTIVE;
 
-// Writes one file of the result directory, which runners poll.
+// Writes one file of the result directory, which runners poll (run.sh and
+// container/entrypoint.sh name the same directory).
 function writeResult(name, text) {
     const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dock-glass-bench']);
     GLib.mkdir_with_parents(dir, 0o755);
@@ -140,11 +141,14 @@ class Bench {
             this._write(this._result(phases));
         } finally {
             global.stage.disconnectObject(this);
-            // Both lists as they were, which turns Dock Glass back on or off,
-            // without this benchmark (session.js). The disabled list goes
-            // first, so it never overrides an entry the enabled list gets
-            // back.
-            const lists = restoredExtensionLists(saved, this._uuid);
+            // Dock Glass back as it was in both lists, and this benchmark
+            // off them (session.js). The disabled list goes first, so it
+            // never overrides an entry the enabled list gets back.
+            const current = {
+                enabled: global.settings.get_strv('enabled-extensions'),
+                disabled: global.settings.get_strv('disabled-extensions'),
+            };
+            const lists = restoredExtensionLists(saved, current, DOCK_GLASS, this._uuid);
             global.settings.set_strv('disabled-extensions', lists.disabled);
             global.settings.set_strv('enabled-extensions', lists.enabled);
         }

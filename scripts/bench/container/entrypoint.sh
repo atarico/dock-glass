@@ -9,7 +9,10 @@ set -eu
 
 ext=/root/.local/share/gnome-shell/extensions
 apps=/root/.local/share/applications
+# Where the benchmark writes (its extension.js and run.sh name the same).
 results=/root/.cache/dock-glass-bench
+# A result left in /out by an earlier run must not pass for this one.
+rm -f /out/result.md /out/result.json /out/error.txt /out/hardware.txt /out/shell.log
 mkdir -p "$ext/dock-glass@atarico.github.io" "$apps"
 cp /src/*.js /src/metadata.json /src/stylesheet.css "$ext/dock-glass@atarico.github.io/"
 cp -r /src/scripts/bench/dock-glass-bench@atarico.github.io "$ext/"
@@ -55,6 +58,7 @@ chmod 700 "$XDG_RUNTIME_DIR"
 # dock-fixed keeps the dock shown: intellihide is not what is measured. The
 # benchmark is installed before the shell starts and run with run.sh, the
 # same script as in a desktop session.
+status=0
 dbus-run-session -- sh -c "
     gsettings set org.gnome.shell enabled-extensions \"['ubuntu-dock@ubuntu.com', 'dock-glass@atarico.github.io']\"
     gsettings set org.gnome.shell favorite-apps \"[${favorites}'org.gnome.Nautilus.desktop']\"
@@ -76,7 +80,7 @@ dbus-run-session -- sh -c "
     kill \$shell 2>/dev/null || true
     wait \$shell 2>/dev/null || true
     exit \$status
-" || true
+" || status=$?
 
 grep -E 'DOCK-GLASS-BENCH|JS ERROR|\[dock-glass\]' /tmp/shell.log || true
 if [ -f "$results/hardware.txt" ]; then
@@ -91,4 +95,4 @@ for file in "$results"/*; do
     cp "$file" /out/
     chown "${HOST_UID:-0}:${HOST_GID:-0}" "/out/$(basename "$file")"
 done
-[ -f /out/result.md ]
+[ "$status" -eq 0 ] && [ -f /out/result.md ]
