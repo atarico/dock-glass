@@ -90,7 +90,7 @@ With Dash to Dock from extensions.gnome.org, set the same four options in its pr
 | GNOME Shell 46 | Supported |
 | Other GNOME Shell versions | Not tested yet; `metadata.json` declares 46 only (see below) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Supported; one of the two docks is required |
-| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported, not tested live yet; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
 | Dock position | Bottom only; side docks are left unchanged |
 | X11 | Tested |
 | Wayland | Not tested |
@@ -113,6 +113,7 @@ To check a version, use a virtual machine (GNOME Boxes, for example) with a dist
 - **Separator grouping.** Unpinned running apps still appear between Files and the Trash.
 - **Keyboard activation.** Opening Files from the keyboard (Enter on a focused icon, or `Super`+number) with no Files windows also opens the places stack.
 - **Dock internals.** The extension hooks private parts of the dock, which Ubuntu Dock and Dash to Dock share, so a dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
+- **Switching docks.** After enabling or disabling Ubuntu Dock or Dash to Dock, restart GNOME Shell (on X11, `Alt`+`F2` then `r`; on Wayland, log out and back in). Ubuntu Dock does not recover from a switch while the shell runs, and Dock Glass picks up the new dock only after the restart.
 
 <details>
 <summary><strong>How it works</strong></summary>

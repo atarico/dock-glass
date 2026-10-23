@@ -90,7 +90,7 @@ Con Dash to Dock de extensions.gnome.org, configurar esas mismas cuatro opciones
 | GNOME Shell 46 | Soportado |
 | Otras versiones de GNOME Shell | Todavía sin probar; `metadata.json` declara solo la 46 (ver abajo) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Soportado; hace falta uno de los dos docks |
-| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado, todavía sin probar en vivo; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
 | Posición del dock | Solo abajo; los docks laterales quedan sin cambios |
 | X11 | Probado |
 | Wayland | Sin probar |
@@ -113,6 +113,7 @@ Para probar una versión, usar una máquina virtual (por ejemplo, GNOME Boxes) c
 - **Agrupación del separador.** Las aplicaciones abiertas que no están ancladas siguen apareciendo entre Archivos y la Papelera.
 - **Activación con el teclado.** Abrir Archivos desde el teclado (Enter sobre un ícono con foco, o `Super`+número) sin ventanas de Archivos también abre la pila de lugares.
 - **Partes internas del dock.** La extensión se engancha a partes privadas del dock, que Ubuntu Dock y Dash to Dock comparten, así que una actualización del dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
+- **Cambiar de dock.** Después de activar o desactivar Ubuntu Dock o Dash to Dock, reiniciar GNOME Shell (en X11, `Alt`+`F2` y después `r`; en Wayland, cerrar sesión y volver a entrar). Ubuntu Dock no se recupera de un cambio con el shell en marcha, y Dock Glass toma el dock nuevo recién después del reinicio.
 
 <details>
 <summary><strong>Cómo funciona</strong></summary>
