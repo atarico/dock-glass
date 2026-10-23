@@ -108,7 +108,7 @@ Other distros use Dash to Dock, from their packages or from extensions.gnome.org
 | 50 | Ubuntu 26.04 | Ubuntu Dock |
 | 51 | Ubuntu 26.10 | Ubuntu Dock |
 
-Each check covered the magnification, the places stack (fan and grid), launching an app from the dock, the genie on open, and disabling and enabling Dock Glass, with no errors in the log. Two GNOME changes touch Dock Glass, and `shellCompat.js` handles both: GNOME 50 removed `Clutter.Grab.get_seat_state()`, and GNOME 51 removed `St.BoxLayout`'s `vertical` in favor of `orientation`, which GNOME 48 added.
+Each check covered the magnification, the places stack (fan and grid), launching an app from the dock, the genie on open, and disabling and enabling Dock Glass, with no Dock Glass errors in the log. Two GNOME changes touch Dock Glass, and `shellCompat.js` handles both: GNOME 50 removed `Clutter.Grab.get_seat_state()`, and GNOME 51 removed `St.BoxLayout`'s `vertical` in favor of `orientation`, which GNOME 48 added.
 
 To check a version by hand, use a virtual machine (GNOME Boxes, for example) with a distro that ships it, such as those above.
 
