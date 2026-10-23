@@ -11,15 +11,15 @@ Una extensión de GNOME Shell que hace que Ubuntu Dock o Dash to Dock se sientan
 
 ## Así se ve
 
-![Los íconos del dock se agrandan y se separan bajo el puntero, mientras la píldora de vidrio refracta la página que tiene detrás](docs/media/glass.gif)
+https://github.com/user-attachments/assets/bd634c8b-6130-4676-b36d-0bb86aa4d3ca
 
 *La magnificación y la píldora de vidrio, sobre el Liquid Glass de Blur My Shell (grabación con zoom).*
 
-![Un clic en el ícono de Archivos despliega los lugares, que vuelven a entrar en el ícono; un clic en Escritorio lo abre](docs/media/files-stack.gif)
+https://github.com/user-attachments/assets/d73059d8-f738-452c-ac48-0fbdbee42390
 
 *La pila de lugares de Archivos: las carpetas salen del ícono, vuelven a entrar en él al cerrarse y se abren con un clic.*
 
-![Una ventana se encoge hasta su ícono del dock con un efecto genio y vuelve a salir de él](docs/media/minimize-restore.gif)
+https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 
 *Minimizar y restaurar con la extensión complementaria Magic Lamp. Dock Glass dirige su genio al lugar de reposo del ícono en el dock.*
 
@@ -90,7 +90,7 @@ Con Dash to Dock de extensions.gnome.org, configurar esas mismas cuatro opciones
 | GNOME Shell 46 | Soportado |
 | Otras versiones de GNOME Shell | Todavía sin probar; `metadata.json` declara solo la 46 (ver abajo) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Soportado; hace falta uno de los dos docks |
-| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado, todavía sin probar en vivo; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Soportado; mientras está activado reemplaza a Ubuntu Dock, y Dock Glass lo sigue |
 | Posición del dock | Solo abajo; los docks laterales quedan sin cambios |
 | X11 | Probado |
 | Wayland | Sin probar |
@@ -113,6 +113,7 @@ Para probar una versión, usar una máquina virtual (por ejemplo, GNOME Boxes) c
 - **Agrupación del separador.** Las aplicaciones abiertas que no están ancladas siguen apareciendo entre Archivos y la Papelera.
 - **Activación con el teclado.** Abrir Archivos desde el teclado (Enter sobre un ícono con foco, o `Super`+número) sin ventanas de Archivos también abre la pila de lugares.
 - **Partes internas del dock.** La extensión se engancha a partes privadas del dock, que Ubuntu Dock y Dash to Dock comparten, así que una actualización del dock puede romperla. Todas se usan a través de `dockAdapter.js`, el único archivo a adaptar cuando eso pase.
+- **Cambiar de dock.** Después de activar o desactivar Ubuntu Dock o Dash to Dock, reiniciar GNOME Shell (en X11, `Alt`+`F2` y después `r`; en Wayland, cerrar sesión y volver a entrar). Ubuntu Dock no se recupera de un cambio con el shell en marcha, y Dock Glass toma el dock nuevo recién después del reinicio.
 
 <details>
 <summary><strong>Cómo funciona</strong></summary>

@@ -11,15 +11,15 @@ A GNOME Shell extension that makes Ubuntu Dock or Dash to Dock feel like the mac
 
 ## See it in action
 
-![Dock icons magnifying and spreading apart under the pointer, with the glass pill refracting the page behind it](docs/media/glass.gif)
+https://github.com/user-attachments/assets/bd634c8b-6130-4676-b36d-0bb86aa4d3ca
 
 *Magnification and the glass pill, on top of Blur My Shell's Liquid Glass (zoomed-in recording).*
 
-![A click on the Files icon fans out the places, which spring back into the icon; a click on Desktop opens it](docs/media/files-stack.gif)
+https://github.com/user-attachments/assets/d73059d8-f738-452c-ac48-0fbdbee42390
 
 *The Files places stack: folders spring out of the icon, fly back into it when it closes, and open with a click.*
 
-![A window shrinking into its dock icon with a genie effect and coming back out of it](docs/media/minimize-restore.gif)
+https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 
 *Minimize and restore with the Magic Lamp companion extension. Dock Glass aims its genie at the icon's resting place in the dock.*
 
@@ -90,7 +90,7 @@ With Dash to Dock from extensions.gnome.org, set the same four options in its pr
 | GNOME Shell 46 | Supported |
 | Other GNOME Shell versions | Not tested yet; `metadata.json` declares 46 only (see below) |
 | Ubuntu Dock (`ubuntu-dock@ubuntu.com`) | Supported; one of the two docks is required |
-| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported, not tested live yet; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
+| Dash to Dock (`dash-to-dock@micxgx.gmail.com`) | Supported; while enabled it replaces Ubuntu Dock, and Dock Glass follows it |
 | Dock position | Bottom only; side docks are left unchanged |
 | X11 | Tested |
 | Wayland | Not tested |
@@ -113,6 +113,7 @@ To check a version, use a virtual machine (GNOME Boxes, for example) with a dist
 - **Separator grouping.** Unpinned running apps still appear between Files and the Trash.
 - **Keyboard activation.** Opening Files from the keyboard (Enter on a focused icon, or `Super`+number) with no Files windows also opens the places stack.
 - **Dock internals.** The extension hooks private parts of the dock, which Ubuntu Dock and Dash to Dock share, so a dock update can break it. They are all reached through `dockAdapter.js`, the one file to adapt when that happens.
+- **Switching docks.** After enabling or disabling Ubuntu Dock or Dash to Dock, restart GNOME Shell (on X11, `Alt`+`F2` then `r`; on Wayland, log out and back in). Ubuntu Dock does not recover from a switch while the shell runs, and Dock Glass picks up the new dock only after the restart.
 
 <details>
 <summary><strong>How it works</strong></summary>
