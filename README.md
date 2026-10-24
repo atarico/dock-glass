@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/d73059d8-f738-452c-ac48-0fbdbee42390
 
 https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 
-*Minimize and restore with the Magic Lamp companion extension. Dock Glass aims its genie at the icon's resting place in the dock.*
+*Minimize and restore: the window pours into the icon's resting place in the dock and back out of it.*
 
 ## Features
 
@@ -30,12 +30,12 @@ https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 | Magnification | Icons grow from their bottom edge as the pointer moves over the dock, 1.4x under it and back to rest size three icons away. Like on macOS, no icon ever shrinks: neighbors spread apart and the pill widens to fit them |
 | Glass pill | A fully rounded dock with a light inner rim, made to sit on top of Blur My Shell's Liquid Glass |
 | Launch bounce | An icon bounces until the app it launched shows its window |
-| Genie on open | New app windows pour out of their dock icon, from where it is drawn even while magnified, and out of the top of the dock's pill, so they never pass under the dock. This replaces GNOME's default open animation. macOS keeps the genie for minimize and restore; this one is a Dock Glass addition |
+| Genie | Windows pour into their dock icon when minimized and back out of it when restored, and new app windows pour out of it when they open, from where it is drawn even while magnified. The window meets the dock at the top of its pill, so it never passes under the dock. This replaces GNOME's default animations. macOS uses the genie for minimize and restore only; the genie on open is a Dock Glass addition |
 | Files places stack | With no Files windows open, a click on the Files icon fans out your places (home, Desktop, Documents, Downloads, Pictures and bookmarks). Items spring out of the icon and fly back into it when the stack closes. With Files windows open, the click works as usual |
 | Files next to the Trash | When Files is your last pinned app, the separator moves to its left, so Files sits with the Trash like the folders of the macOS Dock |
 | Running dot | One small dot under each open app |
 
-For the genie on minimize and restore too, add [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect) (see Recommended setup).
+Dock Glass plays the genie on minimize and restore itself, so it no longer needs [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect). If you have Magic Lamp, turn it off: while it is enabled, Dock Glass leaves minimize and restore to it.
 
 ## Install
 
@@ -81,7 +81,7 @@ With Dash to Dock from extensions.gnome.org, set the same four options in its pr
 | Static blur | Off, so the glass blurs what is actually behind the dock |
 | Pipeline | One "Liquid Glass" effect: blur radius 10, edge size 16, tint 0, shadow 0.1, specular strength 0.6 |
 
-**Optional companions.** [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect) for the genie on minimize and restore. [Burn My Windows](https://github.com/Schneegans/Burn-My-Windows) for close effects; Dock Glass leaves window closing to it. Turn its open effects off, so new windows only get the genie.
+**Optional companion.** [Burn My Windows](https://github.com/Schneegans/Burn-My-Windows) for close effects; Dock Glass leaves window closing to it. Turn its open effects off, so new windows only get the genie. Turn Magic Lamp off if you have it: Dock Glass plays minimize and restore itself, and leaves them to Magic Lamp while it is enabled.
 
 ## Compatibility
 
@@ -133,7 +133,7 @@ To check a version by hand, use a virtual machine (GNOME Boxes, for example) wit
 - **Magnification.** A per-dock `Clutter.Timeline` reads the pointer every frame while it is over the pill. `magnifier.js` turns each icon's distance from the smoothed pointer into a scale (a cosine falloff) and the extra width of the icons in between into a sideways shift. The extension applies them as transforms only: the scale on each icon, the shift on its button (so the running dot follows) and on the separator, and a horizontal scale and shift on the pill background, which Blur My Shell's glass follows. The dock's allocations never change, so its input region, intellihide and minimize targets keep their rest geometry. The loop stops once the icons settle, restarts on pointer motion, and fades out to exactly the rest layout when the pointer leaves.
 - **Events.** Pointer events come from `dashtodockBox`, the dock's reactive, hover-tracked box. Clutter does not route events through the non-reactive dock container.
 - **Stacks.** Files gets an instance `activate` override that opens the places stack only on a plain left click with no Files windows. The stack is a full-stage transparent actor under `Main.pushModal`, and an outside click, a click on the icon or Escape closes it. The dock stays visible through Ubuntu Dock's item menu state while it is open. Opacity eases separately from the springy motion, because Clutter stores it in 8 bits and an overshooting easing mode would wrap it.
-- **Genie on open.** A wrapper around `Main.wm._shouldAnimateActor` skips GNOME's map animation for normal app windows, and a `map` handler adds the genie deform effect instead. It starts from the app's dock icon as drawn at that moment, on the window's monitor when the app has a dock icon there. The genie's narrow end sits on the dock's inner edge (the top of a bottom dock's pill) instead of the screen edge, so the window never passes under the dock; `genieGeometry.js` measures that edge, and while the dock is hidden the genie keeps to the screen edge. The wrapper restores itself only while it is still outermost, so it chains safely with Burn My Windows and Magic Lamp.
+- **Genie.** A wrapper around `Main.wm._shouldAnimateActor` skips GNOME's map animation for normal app windows, and a `map` handler adds the genie deform effect instead. It starts from the app's dock icon as drawn at that moment, on the window's monitor when the app has a dock icon there. The genie's narrow end sits on the dock's inner edge (the top of a bottom dock's pill) instead of the screen edge, so the window never passes under the dock; `genieGeometry.js` measures that edge, and while the dock is hidden the genie keeps to the screen edge. Minimize and restore go through the same wrapper, but without an animation GNOME completes them at once, hiding or showing the window before any genie. So Dock Glass also wraps the window manager's `completed_minimize` and `completed_unminimize`: for the windows it took over, it holds the call and makes it when the genie ends, or when the genie is dropped because the next effect starts, the window closes, the overview opens or Dock Glass is disabled. Minimize and restore aim at the icon's resting place, the minimize target the dock publishes. While Magic Lamp is enabled, Dock Glass leaves minimize and restore to it. The wrappers restore themselves only while still outermost, so they chain safely with Burn My Windows and Magic Lamp.
 - **Separator.** Ubuntu Dock re-inserts the separator after the pinned apps on every redisplay. When the icon before it is Files, the extension moves it one slot left before the next frame. The separator is not an app item, so the dock's app list and drag and drop are unaffected. Disabling the extension undoes the move.
 
 </details>
@@ -144,7 +144,7 @@ To check a version by hand, use a virtual machine (GNOME Boxes, for example) wit
 |------|------|
 | `extension.js` | Hooks into the dock: magnifier, clips, separator, Files stack, launch bounce |
 | `dockAdapter.js` | The only access to the private internals of Ubuntu Dock and Dash to Dock: loading the module of every installed dock, finding the one that runs, its dock manager and each dock's actors |
-| `openAnimation.js` | Replaces the window open animation with the genie |
+| `genieAnimation.js` | Replaces the open, minimize and restore animations with the genie |
 | `genieEffect.js` | The genie deform effect |
 | `genieGeometry.js` | Pure genie math: the stages of the pour and the dock's inner edge |
 | `magnifier.js` | Pure magnification math |
@@ -187,4 +187,4 @@ journalctl -f -o cat /usr/bin/gnome-shell
 
 [GPL-3.0-or-later](LICENSE). Copyright (C) 2026 atarico.
 
-`genieEffect.js` is adapted from the unminimize effect of [Compiz alike magic lamp effect](https://github.com/hermes83/compiz-alike-magic-lamp-effect) by hermes83 (GPL-3.0-or-later).
+`genieEffect.js` is adapted from the minimize and unminimize effects of [Compiz alike magic lamp effect](https://github.com/hermes83/compiz-alike-magic-lamp-effect) by hermes83 (GPL-3.0-or-later).

@@ -2,8 +2,9 @@
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
 // the icons of Ubuntu Dock or Dash to Dock, a macOS-like places stack
 // (stack.js) for Files, and a genie effect from the dock icon when a window
-// opens (openAnimation.js). The dock's private internals are reached only
-// through dockAdapter.js. The pill shape lives in stylesheet.css.
+// opens, minimizes or is restored (genieAnimation.js). The dock's private
+// internals are reached only through dockAdapter.js. The pill shape lives in
+// stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
@@ -18,7 +19,7 @@ import {
     keepFocusInSync,
 } from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
-import {OpenAnimation} from './openAnimation.js';
+import {GenieAnimation} from './genieAnimation.js';
 import {Stack, listPlaces} from './stack.js';
 
 // Stacks. Files opens its places stack only while it has no windows, so a
@@ -91,13 +92,13 @@ export default class DockGlassExtension extends Extension {
             }, this);
         DOCK_UUIDS.forEach(uuid => this._loadDock(uuid));
 
-        this._openAnimation = new OpenAnimation(window => this._findDockIcon(window));
-        this._openAnimation.enable();
+        this._genieAnimation = new GenieAnimation(window => this._findDockIcon(window));
+        this._genieAnimation.enable();
     }
 
     disable() {
-        this._openAnimation.disable();
-        this._openAnimation = null;
+        this._genieAnimation.disable();
+        this._genieAnimation = null;
 
         this._enabled = false;
         if (this._retryId)
@@ -328,13 +329,13 @@ export default class DockGlassExtension extends Extension {
             hold.end();
             return GLib.SOURCE_REMOVE;
         });
-        // Connected after OpenAnimation's own map handler, so the genie is
+        // Connected after GenieAnimation's own map handler, so the genie is
         // already attached when this one runs.
         global.window_manager.connectObject('map', (_wm, actor) => {
             if (actor.meta_window?.get_window_type() !== Meta.WindowType.NORMAL)
                 return;
             global.window_manager.disconnectObject(hold);
-            this._openAnimation.whenOpened(actor, hold.end);
+            this._genieAnimation.whenOpened(actor, hold.end);
         }, hold);
     }
 
