@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 /*
- * Genie effect that "pours" a newly opened window out of its dock icon.
+ * Genie effect that "pours" a window out of its dock icon when it opens or
+ * is restored, and back into it when it is minimized.
  *
- * Adapted from the unminimize effect of Compiz alike magic lamp effect:
- * https://github.com/hermes83/compiz-alike-magic-lamp-effect
+ * Adapted from the minimize and unminimize effects of Compiz alike magic
+ * lamp effect: https://github.com/hermes83/compiz-alike-magic-lamp-effect
  * Copyright (C) 2020 hermes83
  *
  * This program is free software: you can redistribute it and/or modify it
@@ -11,9 +12,11 @@
  * Software Foundation, either version 3 of the License, or (at your option)
  * any later version. See <http://www.gnu.org/licenses/>.
  *
- * Changes: merged the abstract and unminimize classes, removed the
- * completed_unminimize call (opening needs no WM completion), stop the
- * timeline on destroy, and return right after destroying in overview.
+ * Changes: merged the abstract, minimize and unminimize classes (minimizing
+ * runs the stages backwards), the caller completes the window manager's
+ * minimize or unminimize through onDone, the genie ends at the dock's inner
+ * edge instead of the screen edge, stop the timeline on destroy, and return
+ * right after destroying in overview.
  */
 import GObject from 'gi://GObject';
 import Clutter from 'gi://Clutter';
@@ -21,33 +24,39 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-// Magic Lamp defaults, so opening matches minimize and unminimize.
+import {dockDepth, pourStage} from './genieGeometry.js';
+
+// Magic Lamp defaults.
 const EFFECT = 'default';
 const DURATION_MS = 400;
 const X_TILES = 10;
 const Y_TILES = 10;
-// Share of the animation spent widening from the icon edge.
-const SPLIT = 0.3;
 // Distance from a monitor edge within which the icon counts as on that edge.
 const EPSILON = 40;
 
-export class GenieOpenEffect extends Clutter.DeformEffect {
+export class GenieEffect extends Clutter.DeformEffect {
     static {
         GObject.registerClass(this);
     }
 
+    // icon: the rect the window pours out of or into. dock: the rect of the
+    // dock's pill, or null. minimize: pour into the icon instead of out of
+    // it. onDone: called once when the genie ends or is dropped.
     _init(params = {}) {
         super._init();
 
         this.icon = params.icon;
+        this.dock = params.dock ?? null;
+        this.minimize = Boolean(params.minimize);
+        this._onDone = params.onDone ?? null;
         this.monitor = {x: 0, y: 0, width: 0, height: 0};
         this.iconMonitor = {x: 0, y: 0, width: 0, height: 0};
         this.window = {x: 0, y: 0, width: 0, height: 0};
         this.iconPosition = null;
 
         // k and j go from 1 (collapsed into the icon) to 0 (full window).
-        this.k = 1;
-        this.j = 1;
+        this.k = this.minimize ? 0 : 1;
+        this.j = this.minimize ? 0 : 1;
         this.expandWidth = 0;
         this.fullWidth = 0;
         this.expandHeight = 0;
@@ -102,23 +111,26 @@ export class GenieOpenEffect extends Clutter.DeformEffect {
 
         [this.icon.x, this.icon.y, this.icon.width, this.icon.height] = [this.icon.x - this.monitor.x, this.icon.y - this.monitor.y, this.icon.width, this.icon.height];
 
-        // Always pour out from the monitor border next to the icon.
+        // Pour out from the dock's inner edge on the icon's side, so the
+        // window never passes under the dock, or from the monitor border
+        // there while the dock is hidden. The icon rect then spans from the
+        // border to that edge, which is where the math below aims.
         if (this.icon.y + this.icon.height >= this.monitor.height - EPSILON) {
             this.iconPosition = St.Side.BOTTOM;
-            this.icon.y = this.iconMonitor.y + this.iconMonitor.height - this.monitor.y;
-            this.icon.height = 0;
+            this.icon.height = dockDepth('bottom', this.dock, this.iconMonitor);
+            this.icon.y = this.iconMonitor.y + this.iconMonitor.height - this.monitor.y - this.icon.height;
         } else if (this.icon.x <= EPSILON) {
             this.iconPosition = St.Side.LEFT;
             this.icon.x = this.iconMonitor.x - this.monitor.x;
-            this.icon.width = 0;
+            this.icon.width = dockDepth('left', this.dock, this.iconMonitor);
         } else if (this.icon.x + this.icon.width >= this.monitor.width - EPSILON) {
             this.iconPosition = St.Side.RIGHT;
-            this.icon.x = this.iconMonitor.x + this.iconMonitor.width - this.monitor.x;
-            this.icon.width = 0;
+            this.icon.width = dockDepth('right', this.dock, this.iconMonitor);
+            this.icon.x = this.iconMonitor.x + this.iconMonitor.width - this.monitor.x - this.icon.width;
         } else {
             this.iconPosition = St.Side.TOP;
             this.icon.y = this.iconMonitor.y - this.monitor.y;
-            this.icon.height = 0;
+            this.icon.height = dockDepth('top', this.dock, this.iconMonitor);
         }
 
         this.set_n_tiles(X_TILES, Y_TILES);
@@ -144,6 +156,10 @@ export class GenieOpenEffect extends Clutter.DeformEffect {
         }
 
         this.actor?.remove_effect(this);
+
+        const onDone = this._onDone;
+        this._onDone = null;
+        onDone?.();
     }
 
     _onNewFrame(timeline) {
@@ -156,8 +172,7 @@ export class GenieOpenEffect extends Clutter.DeformEffect {
         }
 
         const progress = timeline.get_progress();
-        this.k = 1 - (progress > 1 - SPLIT ? (progress - (1 - SPLIT)) / SPLIT : 0);
-        this.j = 1 - (progress <= 1 - SPLIT ? progress / (1 - SPLIT) : 1);
+        ({k: this.k, j: this.j} = pourStage(this.minimize ? 1 - progress : progress));
 
         this.actor.get_parent()?.queue_redraw();
         this.invalidate();

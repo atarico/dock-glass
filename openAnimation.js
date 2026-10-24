@@ -7,14 +7,15 @@ import St from 'gi://St';
 
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
-import {GenieOpenEffect} from './genieEffect.js';
+import {GenieEffect} from './genieEffect.js';
 
 const EFFECT_NAME = 'dock-glass-open-genie';
 
 export class OpenAnimation {
-    // findIconRect(window) returns the app's dock icon rect, or null.
-    constructor(findIconRect) {
-        this._findIconRect = findIconRect;
+    // findDockIcon(window) returns {icon, dock}, the rects of the app's dock
+    // icon and of that dock's pill (or null), or null without a dock icon.
+    constructor(findDockIcon) {
+        this._findDockIcon = findDockIcon;
         this._suppressed = new WeakSet();
         this._active = false;
         this._previous = null;
@@ -91,7 +92,7 @@ export class OpenAnimation {
             return;
 
         actor.show();
-        const effect = new GenieOpenEffect({icon: this._getIconRect(actor.meta_window)});
+        const effect = new GenieEffect(this._getTarget(actor.meta_window));
         actor.add_effect_with_name(EFFECT_NAME, effect);
         // The effect sets itself up while being added; drop it if it could not,
         // since an idle deform effect still renders the window offscreen.
@@ -110,17 +111,17 @@ export class OpenAnimation {
     }
 
     // The icon as drawn right now comes first, so the window pours out of it
-    // even while the magnifier has moved or grown it. The window's icon
-    // geometry is the rest slot Ubuntu Dock publishes for minimizing; it is
-    // unset for an app's first window, and zeros fall back to the monitor
-    // bottom.
-    _getIconRect(window) {
-        const icon = this._findIconRect(window);
-        if (icon)
-            return icon;
+    // even while the magnifier has moved or grown it, and out of the top of
+    // its dock's pill. The window's icon geometry is the rest slot Ubuntu
+    // Dock publishes for minimizing; it is unset for an app's first window,
+    // and zeros fall back to the monitor bottom.
+    _getTarget(window) {
+        const found = this._findDockIcon(window);
+        if (found)
+            return found;
         const [ok, rect] = window.get_icon_geometry();
         if (ok)
-            return {x: rect.x, y: rect.y, width: rect.width, height: rect.height};
-        return {x: 0, y: 0, width: 0, height: 0};
+            return {icon: {x: rect.x, y: rect.y, width: rect.width, height: rect.height}, dock: null};
+        return {icon: {x: 0, y: 0, width: 0, height: 0}, dock: null};
     }
 }

@@ -58,6 +58,15 @@ const BOUNCE_TIMEOUT_S = 10;
 // poured out of the stack's icon, and at most this long when no window opens.
 const LAUNCH_HOLD_MAX_MS = 3000;
 
+// An actor's rect in stage coordinates, or null without one.
+function stageRect(actor) {
+    if (!actor)
+        return null;
+    const [x, y] = actor.get_transformed_position();
+    const [width, height] = actor.get_transformed_size();
+    return [x, y, width, height].every(Number.isFinite) ? {x, y, width, height} : null;
+}
+
 export default class DockGlassExtension extends Extension {
     enable() {
         this._enabled = true;
@@ -82,7 +91,7 @@ export default class DockGlassExtension extends Extension {
             }, this);
         DOCK_UUIDS.forEach(uuid => this._loadDock(uuid));
 
-        this._openAnimation = new OpenAnimation(window => this._findIconRect(window));
+        this._openAnimation = new OpenAnimation(window => this._findDockIcon(window));
         this._openAnimation.enable();
     }
 
@@ -469,24 +478,24 @@ export default class DockGlassExtension extends Extension {
     }
 
     // Rect of the window's app icon as drawn, magnified and spread or not,
-    // preferring the dock on the window's monitor. A launch bounce moves only
-    // its clone, so the icon stays on the dock.
-    _findIconRect(window) {
+    // and of its dock's pill (null without one), preferring the dock on the
+    // window's monitor. A launch bounce moves only its clone, so the icon
+    // stays on the dock.
+    _findDockIcon(window) {
         const app = Shell.WindowTracker.get_default().get_window_app(window);
         const monitor = Main.layoutManager.monitors[window.get_monitor()];
         let fallback = null;
-        for (const [button, {icon}] of this._buttons) {
+        for (const [button, {icon, dock}] of this._buttons) {
             if (!app || button.app !== app)
                 continue;
 
-            const [x, y] = icon.get_transformed_position();
-            const [width, height] = icon.get_transformed_size();
-            if (![x, y, width, height].every(Number.isFinite))
+            const rect = stageRect(icon);
+            if (!rect)
                 continue;
-            const rect = {x, y, width, height};
-            if (monitor && x >= monitor.x && x < monitor.x + monitor.width)
-                return rect;
-            fallback ??= rect;
+            const found = {icon: rect, dock: stageRect(dock.background)};
+            if (monitor && rect.x >= monitor.x && rect.x < monitor.x + monitor.width)
+                return found;
+            fallback ??= found;
         }
         return fallback;
     }
