@@ -20,3 +20,13 @@ export function offMonitor([x, y], monitor) {
     return x < monitor.x || x > monitor.x + monitor.width ||
         y < monitor.y || y > monitor.y + monitor.height;
 }
+
+// Whether icon centers ([x, y] each) lie in a row, spread wider than tall:
+// Dock Glass only magnifies a dock at the bottom, laid out that way.
+export function inRow(points) {
+    if (points.length < 2)
+        return false;
+    const xs = points.map(([x]) => x);
+    const ys = points.map(([, y]) => y);
+    return Math.max(...xs) - Math.min(...xs) > Math.max(...ys) - Math.min(...ys);
+}

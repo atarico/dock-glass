@@ -5,16 +5,17 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 
-import {offMonitor, sweepX} from '../scripts/bench/dock-glass-bench@atarico.github.io/motion.js';
+import {inRow, offMonitor, sweepX} from '../scripts/bench/dock-glass-bench@atarico.github.io/motion.js';
 import {restoredExtensionLists} from '../scripts/bench/dock-glass-bench@atarico.github.io/session.js';
 
 const BENCH = 'dock-glass-bench@atarico.github.io';
 const DOCK_GLASS = 'dock-glass@atarico.github.io';
-
-// What the benchmark saved before the run, and the lists as it leaves them:
-// it toggled Dock Glass (disableExtension() also adds the uuid to
-// disabled-extensions, which overrides enabled-extensions) and enabled itself.
 const OTHER = 'other@example.com';
+
+// In the list tests, `saved` holds the lists before the run and `current`
+// the lists as the run leaves them: it toggled Dock Glass
+// (disableExtension() also adds the uuid to disabled-extensions, which
+// overrides enabled-extensions) and enabled itself.
 
 test('Dock Glass that was on comes back on, in its place in both lists', () => {
     const saved = {enabled: ['ubuntu-dock@ubuntu.com', DOCK_GLASS, OTHER, BENCH], disabled: []};
@@ -61,6 +62,12 @@ test('the sweep goes back and forth between the ends at a steady speed', () => {
     assert.equal(sweepX(10, 110, 50, 4), 10);
     assert.equal(sweepX(10, 110, 50, 5), 60);
     assert.equal(sweepX(10, 10, 50, 3), 10);
+});
+
+test('a dock laid out in a row is told from a vertical one', () => {
+    assert.equal(inRow([[900, 1040], [960, 1040], [1020, 1041]]), true);
+    assert.equal(inRow([[36, 300], [36, 360], [37, 420]]), false);
+    assert.equal(inRow([[900, 1040]]), false);
 });
 
 test('an icon is off the monitor past any of its edges', () => {

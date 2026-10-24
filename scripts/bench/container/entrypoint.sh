@@ -64,6 +64,7 @@ dbus-run-session -- sh -c "
     gsettings set org.gnome.shell favorite-apps \"[${favorites}'org.gnome.Nautilus.desktop']\"
     gsettings set org.gnome.desktop.interface enable-animations true
     gsettings set org.gnome.shell.extensions.dash-to-dock dock-fixed true
+    gsettings set org.gnome.shell.extensions.dash-to-dock dock-position BOTTOM
     gnome-shell --headless --wayland --no-x11 --virtual-monitor 1920x1080 --force-animations > /tmp/shell.log 2>&1 &
     shell=\$!
     loaded=no

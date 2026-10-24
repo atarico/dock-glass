@@ -13,17 +13,16 @@ import St from 'gi://St';
 import System from 'system';
 
 import * as Config from 'resource:///org/gnome/shell/misc/config.js';
+import {ExtensionState} from 'resource:///org/gnome/shell/misc/extensionUtils.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 
-import {offMonitor, sweepX} from './motion.js';
+import {inRow, offMonitor, sweepX} from './motion.js';
 import {restoredExtensionLists} from './session.js';
 import {cpuMsPerFrame, cpuPercent, cpuTicks, formatTable, percentile, rssKb, summarize} from './stats.js';
 
 const DOCK_GLASS = 'dock-glass@atarico.github.io';
 const FILES_APP_ID = 'org.gnome.Nautilus.desktop';
-// ExtensionState's value for an extension that is enabled and running.
-const STATE_ACTIVE = 1;
 
 // Rounds per condition, alternating which goes first so drift spreads
 // evenly; each scenario reports the median across rounds.
@@ -71,21 +70,59 @@ function center(actor) {
     return [x + width / 2, y + height / 2];
 }
 
-const isActive = uuid => Main.extensionManager.lookup(uuid)?.state === STATE_ACTIVE;
+const isActive = uuid => Main.extensionManager.lookup(uuid)?.state === ExtensionState.ACTIVE;
 
-// Writes one file of the result directory, which runners poll (run.sh and
+// A file of the result directory, which runners poll (run.sh and
 // container/entrypoint.sh name the same directory).
-function writeResult(name, text) {
+function resultPath(name) {
     const dir = GLib.build_filenamev([GLib.get_user_cache_dir(), 'dock-glass-bench']);
     GLib.mkdir_with_parents(dir, 0o755);
-    GLib.file_set_contents(`${dir}/${name}`, text);
     return `${dir}/${name}`;
+}
+
+function writeResult(name, text) {
+    const path = resultPath(name);
+    GLib.file_set_contents(path, text);
+    return path;
+}
+
+// The extension lists saved before a run also go to this file, removed once
+// they are put back, so a run cut short by a shell restart or crash can
+// still be undone at the next start.
+const SAVED_LISTS = 'saved-lists.json';
+
+function readLists() {
+    return {
+        enabled: global.settings.get_strv('enabled-extensions'),
+        disabled: global.settings.get_strv('disabled-extensions'),
+    };
+}
+
+// Dock Glass back as it was in both lists, and the benchmark off them
+// (session.js). The disabled list goes first, so it never overrides an
+// entry the enabled list gets back.
+function restoreLists(saved, benchUuid) {
+    const lists = restoredExtensionLists(saved, readLists(), DOCK_GLASS, benchUuid);
+    global.settings.set_strv('disabled-extensions', lists.disabled);
+    global.settings.set_strv('enabled-extensions', lists.enabled);
+    GLib.unlink(resultPath(SAVED_LISTS));
 }
 
 export default class DockGlassBench extends Extension {
     enable() {
         if (globalThis[RUNNING])
             return;
+        // Saved lists left behind mean the last run never got to put them
+        // back: do that instead of running, once the shell is done enabling.
+        if (GLib.file_test(resultPath(SAVED_LISTS), GLib.FileTest.EXISTS)) {
+            GLib.idle_add(GLib.PRIORITY_DEFAULT_IDLE, () => {
+                restoreLists(JSON.parse(readText(resultPath(SAVED_LISTS))), this.uuid);
+                writeResult('error.txt', 'The last run was cut short; the extension lists are back as ' +
+                    'they were. Run the benchmark again.\n');
+                return GLib.SOURCE_REMOVE;
+            });
+            return;
+        }
         globalThis[RUNNING] = true;
         globalThis[ABORTED] = false;
         new Bench(this.uuid, this.path).run()
@@ -113,10 +150,8 @@ class Bench {
     }
 
     async run() {
-        const saved = {
-            enabled: global.settings.get_strv('enabled-extensions'),
-            disabled: global.settings.get_strv('disabled-extensions'),
-        };
+        const saved = readLists();
+        writeResult(SAVED_LISTS, JSON.stringify(saved));
         const backend = global.stage.context?.get_backend?.() ?? Clutter.get_default_backend();
         const seat = backend.get_default_seat();
         this._pointer = seat.create_virtual_device(Clutter.InputDeviceType.POINTER_DEVICE);
@@ -141,16 +176,7 @@ class Bench {
             this._write(this._result(phases));
         } finally {
             global.stage.disconnectObject(this);
-            // Dock Glass back as it was in both lists, and this benchmark
-            // off them (session.js). The disabled list goes first, so it
-            // never overrides an entry the enabled list gets back.
-            const current = {
-                enabled: global.settings.get_strv('enabled-extensions'),
-                disabled: global.settings.get_strv('disabled-extensions'),
-            };
-            const lists = restoredExtensionLists(saved, current, DOCK_GLASS, this._uuid);
-            global.settings.set_strv('disabled-extensions', lists.disabled);
-            global.settings.set_strv('enabled-extensions', lists.enabled);
+            restoreLists(saved, this._uuid);
         }
     }
 
@@ -194,6 +220,10 @@ class Bench {
         await this._until(() => this._icons().length >= 2,
             'The dock did not come back, or it has fewer than two app icons');
         await this._wait(SETTLE_MS);
+        if (!inRow(this._icons().map(center))) {
+            throw new Error('The dock is vertical, and Dock Glass only magnifies a dock at the bottom. ' +
+                'Move the dock to the bottom (Settings, Ubuntu Desktop, Position on screen) and run again');
+        }
         const monitor = Main.layoutManager.primaryMonitor;
         if (this._icons().some(icon => offMonitor(center(icon), monitor))) {
             throw new Error('The dock is hidden. Show the desktop (Super+D) so no window covers it, ' +
@@ -242,8 +272,10 @@ class Bench {
     }
 
     // CPU, frames per second, CPU per frame and paint p95 while `action`
-    // runs; frames are those of the view that painted the most (the dock's
-    // monitor).
+    // runs. CPU is the whole gnome-shell process; frames are those of the
+    // view that painted the most (the dock's monitor while the dock
+    // animates), so with several monitors CPU per frame also carries what
+    // the other monitors painted.
     async _measure(action) {
         this._paints = new Map();
         this._paintStarts.clear();
