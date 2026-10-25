@@ -6,13 +6,11 @@
 import Meta from 'gi://Meta';
 import St from 'gi://St';
 
-import {ExtensionState} from 'resource:///org/gnome/shell/misc/extensionUtils.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 
 import {GenieEffect} from './genieEffect.js';
 
 const EFFECT_NAME = 'dock-glass-genie';
-const MAGIC_LAMP_UUID = 'compiz-alike-magic-lamp-effect@hermes83.github.com';
 
 // GNOME's handlers whose default animation the genie replaces, as they show
 // in the stack while they ask _shouldAnimateActor.
@@ -71,14 +69,18 @@ export class GenieAnimation {
         // GNOME binds its window handlers at startup, so _shouldAnimateActor
         // is the only hook. Returning false makes them complete at once: the
         // map handler above, which runs right after it, and the wrappers
-        // above animate instead.
+        // above animate instead. Minimize and restore first ask the methods
+        // this one wraps, and take over only what GNOME would animate: that
+        // consumes a skipped effect (the window cycler restores without one),
+        // and Magic Lamp turns them down too, wrapped inside or outside this.
         this._wrap(Main.wm, '_shouldAnimateActor', previous => function (actor, types) {
             const handler = self._takeOver(actor);
-            if (handler) {
-                self._suppressed.set(actor, handler);
+            if (!handler)
+                return previous.call(this, actor, types);
+            if (handler !== 'map' && !previous.call(this, actor, types))
                 return false;
-            }
-            return previous.call(this, actor, types);
+            self._suppressed.set(actor, handler);
+            return false;
         });
     }
 
@@ -112,10 +114,7 @@ export class GenieAnimation {
             if (!this._active || !this._isEligible(actor))
                 return null;
             const stack = new Error().stack;
-            const handler = HANDLERS.find(([frame]) => stack.includes(frame))?.[1] ?? null;
-            if (handler !== 'map' && this._isMagicLampActive())
-                return null;
-            return handler;
+            return HANDLERS.find(([frame]) => stack.includes(frame))?.[1] ?? null;
         } catch (e) {
             console.error(`[dock-glass] Window animation check failed: ${e}`);
             return null;
@@ -130,10 +129,6 @@ export class GenieAnimation {
             !Main.overview.visible &&
             !Main.sessionMode.isLocked &&
             St.Settings.get().enable_animations;
-    }
-
-    _isMagicLampActive() {
-        return Main.extensionManager.lookup(MAGIC_LAMP_UUID)?.state === ExtensionState.ACTIVE;
     }
 
     // Whether the wrapper skipped this actor's default animation for that
@@ -155,16 +150,25 @@ export class GenieAnimation {
 
     // Pours the window out of its dock icon, or into it when minimizing.
     // onDone runs once, when the genie ends or is dropped, or at once when
-    // there is none.
+    // there is none, so a held minimize or restore always completes.
     _play(actor, {minimize = false, fromRestSlot = false, onDone = null} = {}) {
-        actor.get_effect(EFFECT_NAME)?.destroy();
-        const target = this._getTarget(actor.meta_window, fromRestSlot);
-        const effect = new GenieEffect({...target, minimize, onDone});
-        actor.add_effect_with_name(EFFECT_NAME, effect);
+        let effect = null;
+        try {
+            actor.get_effect(EFFECT_NAME)?.destroy();
+            const target = this._getTarget(actor.meta_window, fromRestSlot);
+            effect = new GenieEffect({...target, minimize, onDone});
+            actor.add_effect_with_name(EFFECT_NAME, effect);
+        } catch (e) {
+            console.error(`[dock-glass] Cannot play the genie: ${e}`);
+        }
+        if (effect?.initialized)
+            return;
         // The effect sets itself up while being added; drop it if it could not,
         // since an idle deform effect still renders the window offscreen.
-        if (!effect.initialized)
+        if (effect)
             effect.destroy();
+        else
+            onDone?.();
     }
 
     // Calls done once the genie of a window that just mapped has poured it
