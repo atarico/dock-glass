@@ -201,10 +201,18 @@ export class GenieEffect extends Clutter.DeformEffect {
 
         this.actor?.remove_effect(this);
 
+        // One failing callback must not keep the others from running: onDone
+        // completes a held minimize, and whenDone callbacks release the dock.
         const callbacks = [this._onDone, ...this._whenDone];
         this._onDone = null;
         this._whenDone = [];
-        callbacks.forEach(callback => callback?.());
+        for (const callback of callbacks) {
+            try {
+                callback?.();
+            } catch (e) {
+                console.error(`[dock-glass] Genie callback failed: ${e}`);
+            }
+        }
     }
 
     _onNewFrame(timeline) {
