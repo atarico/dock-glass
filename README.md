@@ -117,6 +117,57 @@ To check a version by hand, use a virtual machine (GNOME Boxes, for example) wit
 3. There, run `gnome-extensions install --force dock-glass@atarico.github.io.shell-extension.zip`, log out and back in, and run `gnome-extensions enable dock-glass@atarico.github.io`.
 4. Use the dock while `journalctl -f -o cat /usr/bin/gnome-shell` runs in a terminal, and look for errors.
 
+## Performance
+
+What gnome-shell spends with and without Dock Glass, measured by `scripts/bench/`. The benchmark turns Dock Glass off and on in the same session and runs each scenario three times per condition, alternating which goes first; the tables show the medians. CPU is gnome-shell's own, as a percent of one core.
+
+- **Idle:** 20 s without touching anything.
+- **Dock sweep:** a virtual pointer crosses the dock end to end at 800 px/s for 15 s.
+- **Open and close windows:** four small GTK windows open, stay 1.5 s and close.
+- **Files stack:** the stack opens and closes four times. It exists only with Dock Glass.
+
+**On a laptop:** AMD Ryzen 5 4600H, rendering on its Radeon RX Vega 6, GNOME Shell 46 on X11 at 60 Hz, Ubuntu Dock at the bottom. Burn My Windows was off, so "without" is GNOME's own window animation.
+
+| Scenario | CPU without | CPU with | Frames/s without | Frames/s with | CPU per frame without | CPU per frame with |
+|---|---|---|---|---|---|---|
+| Idle | 0.6 % | 0.4 % | 0 | 0 | n/a | n/a |
+| Dock sweep | 23.4 % | 27.9 % | 60 | 60 | 3.9 ms | 4.7 ms |
+| Open and close windows | 14.5 % | 17.0 % | 13 | 19 | 11.2 ms | 9.0 ms |
+| Files stack | n/a | 8.6 % | n/a | 22 | n/a | 4.0 ms |
+
+gnome-shell memory (RSS) after each round: 369 MB without, 370 MB with.
+
+- **Idle and memory:** no measurable difference. The magnifier's frame loop only runs while the pointer is over the dock or the icons settle.
+- **Dock sweep:** the magnifier costs about 4.5 % of one core, 0.8 ms more per frame, and the dock keeps 60 frames per second.
+- **Windows:** the genie paints more frames than GNOME's own animation (19 against 13 per second over the scenario). Each frame is cheaper, but the scenario costs about 2.5 % of one core more in all.
+
+**In a container:** the same CPU, with GNOME Shell 46 headless in Docker and software rendering (llvmpipe). A headless shell has no display to pace it, so it paints as fast as it can. There, CPU percent and frames per second show throughput, not cost, and CPU above 100 % counts llvmpipe's threads. Compare CPU per frame, without and with.
+
+| Scenario | CPU without | CPU with | Frames/s without | Frames/s with | CPU per frame without | CPU per frame with |
+|---|---|---|---|---|---|---|
+| Idle | 0.1 % | 0.1 % | 0 | 0 | n/a | n/a |
+| Dock sweep | 181.9 % | 283.0 % | 252 | 451 | 7.2 ms | 6.3 ms |
+| Open and close windows | 122.9 % | 117.2 % | 85 | 80 | 14.4 ms | 15.9 ms |
+| Files stack | n/a | 31.0 % | n/a | 55 | n/a | 5.6 ms |
+
+gnome-shell memory (RSS) after each round: 283 MB without, 285 MB with.
+
+In the container, Dock Glass makes the dock sweep paint almost twice as many frames, so its CPU per frame alone cannot tell cheaper frames from more of them. The laptop run, paced at 60 Hz, is the one to read for the sweep. Two runs on the same machine differ by up to about 15 %, so treat smaller differences as noise. Paint time percentiles are in `result.json`, not in the tables.
+
+To measure your own machine, with Dock Glass installed and the dock at the bottom, run this from the clone:
+
+```sh
+sh scripts/bench/run.sh
+```
+
+The first run installs the benchmark and asks you to restart GNOME Shell. After that, run it again, show the desktop (`Super`+`D`) so no window covers the dock, and leave the mouse and keyboard alone for about seven minutes. It prints the table with your CPU and GPU, keeps the full result in `~/.cache/dock-glass-bench/`, then disables and removes itself and leaves Dock Glass as it was. To compare against GNOME's own window animation, turn off other extensions that animate windows, such as Burn My Windows, for the run.
+
+To run it in Docker instead (about 1 GB of disk for the image):
+
+```sh
+sh scripts/bench/container.sh
+```
+
 ## Known limitations
 
 - **Hardcoded values.** The magnification peak, its reach and the glass are fixed until the preferences window exists.
@@ -156,6 +207,7 @@ To check a version by hand, use a virtual machine (GNOME Boxes, for example) wit
 | `scripts/build-locale.sh` | Compiles `po/` into `locale/`, where GNOME Shell reads them |
 | `scripts/pack.sh` | Builds the installable zip, translations included |
 | `scripts/genie-check/` | Headless GNOME Shell check of the genie with real windows, in Docker |
+| `scripts/bench/` | Benchmark of gnome-shell's CPU, frames and memory with and without Dock Glass, in your session or in Docker (see [Performance](#performance)) |
 | `.github/workflows/ci.yml` | Tests, syntax check and packing on GitHub Actions, plus releases on `v*` tags |
 
 The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer can test them from the repository root:
