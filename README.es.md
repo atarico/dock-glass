@@ -117,6 +117,57 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 3. Ahí, ejecutar `gnome-extensions install --force dock-glass@atarico.github.io.shell-extension.zip`, cerrar sesión y volver a entrar, y ejecutar `gnome-extensions enable dock-glass@atarico.github.io`.
 4. Usar el dock mientras `journalctl -f -o cat /usr/bin/gnome-shell` corre en una terminal, y buscar errores.
 
+## Rendimiento
+
+Lo que gasta gnome-shell con y sin Dock Glass, medido con `scripts/bench/`. El benchmark desactiva y activa Dock Glass en la misma sesión y corre cada escenario tres veces por condición, alternando cuál va primero; las tablas muestran las medianas. El uso de CPU es el del propio gnome-shell, como porcentaje de un núcleo.
+
+- **Reposo:** 20 s sin tocar nada.
+- **Barrido del dock:** un puntero virtual recorre el dock de punta a punta a 800 px/s durante 15 s.
+- **Abrir y cerrar ventanas:** cuatro ventanas GTK pequeñas se abren, quedan 1,5 s y se cierran.
+- **Pila de Archivos:** la pila se abre y se cierra cuatro veces. Solo existe con Dock Glass.
+
+**En una laptop:** AMD Ryzen 5 4600H, con su Radeon RX Vega 6 dibujando, GNOME Shell 46 en X11 a 60 Hz, Ubuntu Dock abajo. Burn My Windows estaba desactivado, así que "sin" es la animación de ventanas propia de GNOME.
+
+| Escenario | CPU sin | CPU con | Cuadros/s sin | Cuadros/s con | CPU por cuadro sin | CPU por cuadro con |
+|---|---|---|---|---|---|---|
+| Reposo | 0,6 % | 0,4 % | 0 | 0 | n/d | n/d |
+| Barrido del dock | 23,4 % | 27,9 % | 60 | 60 | 3,9 ms | 4,7 ms |
+| Abrir y cerrar ventanas | 14,5 % | 17,0 % | 13 | 19 | 11,2 ms | 9,0 ms |
+| Pila de Archivos | n/d | 8,6 % | n/d | 22 | n/d | 4,0 ms |
+
+Memoria de gnome-shell (RSS) después de cada ronda: 369 MB sin, 370 MB con.
+
+- **Reposo y memoria:** sin diferencia medible. El ciclo por cuadro de la magnificación solo corre mientras el puntero está sobre el dock o los íconos se acomodan.
+- **Barrido del dock:** la magnificación cuesta alrededor de un 4,5 % de un núcleo, 0,8 ms más por cuadro, y el dock se mantiene en 60 cuadros por segundo.
+- **Ventanas:** el genio dibuja más cuadros que la animación propia de GNOME (19 contra 13 por segundo en el escenario). Cada cuadro es más barato, pero el escenario cuesta en total alrededor de un 2,5 % más de un núcleo.
+
+**En un contenedor:** la misma CPU, con GNOME Shell 46 sin pantalla en Docker y dibujo por software (llvmpipe). Un shell sin pantalla no tiene un monitor que le marque el ritmo, así que dibuja tan rápido como puede. Ahí, el porcentaje de CPU y los cuadros por segundo muestran rendimiento bruto, no costo, y un uso de CPU por encima del 100 % cuenta los hilos de llvmpipe. Hay que comparar el tiempo de CPU por cuadro, sin y con.
+
+| Escenario | CPU sin | CPU con | Cuadros/s sin | Cuadros/s con | CPU por cuadro sin | CPU por cuadro con |
+|---|---|---|---|---|---|---|
+| Reposo | 0,1 % | 0,1 % | 0 | 0 | n/d | n/d |
+| Barrido del dock | 181,9 % | 283,0 % | 252 | 451 | 7,2 ms | 6,3 ms |
+| Abrir y cerrar ventanas | 122,9 % | 117,2 % | 85 | 80 | 14,4 ms | 15,9 ms |
+| Pila de Archivos | n/d | 31,0 % | n/d | 55 | n/d | 5,6 ms |
+
+Memoria de gnome-shell (RSS) después de cada ronda: 283 MB sin, 285 MB con.
+
+En el contenedor, Dock Glass hace que el barrido del dock dibuje casi el doble de cuadros, así que el tiempo de CPU por cuadro por sí solo no distingue cuadros más baratos de más cuadros. Para el barrido, la medición que vale es la de la laptop, con el ritmo de 60 Hz. Dos corridas en la misma máquina difieren hasta un 15 % aproximadamente, así que las diferencias más pequeñas son ruido. Los percentiles del tiempo de dibujo están en `result.json`, no en las tablas.
+
+Para medir otra máquina, con Dock Glass instalado y el dock abajo, ejecutar esto desde el clon:
+
+```sh
+sh scripts/bench/run.sh
+```
+
+La primera ejecución instala el benchmark y pide reiniciar GNOME Shell. Después, ejecutarlo de nuevo, mostrar el escritorio (`Super`+`D`) para que ninguna ventana tape el dock, y no tocar el mouse ni el teclado durante unos siete minutos. Muestra la tabla con la CPU y la GPU de la máquina, guarda el resultado completo en `~/.cache/dock-glass-bench/`, y al terminar se desactiva, se borra y deja Dock Glass como estaba. Para comparar contra la animación de ventanas propia de GNOME, desactivar durante la corrida otras extensiones que animan ventanas, como Burn My Windows.
+
+Para correrlo en Docker (alrededor de 1 GB de disco para la imagen):
+
+```sh
+sh scripts/bench/container.sh
+```
+
 ## Limitaciones conocidas
 
 - **Valores fijos.** El tamaño máximo de la magnificación, su alcance y el vidrio son fijos hasta que exista la ventana de preferencias.
@@ -156,6 +207,7 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 | `scripts/build-locale.sh` | Compila `po/` en `locale/`, donde GNOME Shell las lee |
 | `scripts/pack.sh` | Genera el zip instalable, con las traducciones |
 | `scripts/genie-check/` | Prueba del genio con ventanas reales en un GNOME Shell sin pantalla, en Docker |
+| `scripts/bench/` | Benchmark del uso de CPU, los cuadros y la memoria de gnome-shell con y sin Dock Glass, en la sesión actual o en Docker (ver [Rendimiento](#rendimiento)) |
 | `.github/workflows/ci.yml` | Pruebas, verificación de sintaxis y empaquetado en GitHub Actions, más versiones publicadas con etiquetas `v*` |
 
 La matemática pura y el adaptador del dock no importan nada de GNOME, así que Node.js 22 o más nuevo puede probarlos desde la raíz del repositorio:
