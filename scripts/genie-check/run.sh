@@ -5,7 +5,7 @@
 # overview, Dock Glass or Magic Lamp turned on and off mid-genie, the window
 # cycler's skipped effect, and that every minimize and restore reaches the
 # window manager exactly once. Prints the DGPROBE lines and exits non-zero
-# when a check fails. Takes about seven minutes.
+# when a check fails. Takes about four minutes once the image is built.
 # Needs Docker and about 1.5 GB of disk for each image.
 # Usage: sh scripts/genie-check/run.sh [46|51]
 #   46 (default): Ubuntu 24.04, GNOME Shell 46, Ubuntu Dock

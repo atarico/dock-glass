@@ -172,7 +172,7 @@ sh scripts/pack.sh
 
 GitHub Actions runs the tests, a syntax check of every module and the packing on every pull request and push to `main`. Pushing a `v*` tag also publishes a GitHub release with the packed zip.
 
-The rest of the GNOME Shell side has no automated tests in CI. The genie, which holds the window manager's minimize and restore until it ends, has a check in a headless GNOME Shell inside Docker (about seven minutes, 1.5 GB of disk per image): real GTK windows (one of them an X11 client) open, minimize and restore while Dock Glass and Magic Lamp are turned on and off, and every minimize and restore must complete exactly once.
+The rest of the GNOME Shell side has no automated tests in CI. The genie, which holds the window manager's minimize and restore until it ends, has a check in a headless GNOME Shell inside Docker (about four minutes once the image is built, 1.5 GB of disk per image): real GTK windows (one of them an X11 client) open, minimize and restore while Dock Glass and Magic Lamp are turned on and off, and every minimize and restore must complete exactly once.
 
 ```sh
 sh scripts/genie-check/run.sh 46   # or 51

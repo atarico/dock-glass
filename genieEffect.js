@@ -208,8 +208,13 @@ export class GenieEffect extends Clutter.DeformEffect {
     }
 
     _onNewFrame(timeline) {
-        if (!this.actor)
+        // A window closed during a workspace switch loses its actor with no
+        // kill-window-effects or destroy signal; the timeline repeats until
+        // the genie ends it, so end it here.
+        if (!this.actor) {
+            this.destroy();
             return;
+        }
 
         if (Main.overview.visible) {
             this.destroy();

@@ -19,6 +19,7 @@ import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 const DG = 'dock-glass@atarico.github.io';
 const ML = 'compiz-alike-magic-lamp-effect@hermes83.github.com';
 const ANIM_MS = 1800;
+const X11 = 'org.dockglass.ProbeX11.desktop';
 
 const wait = ms => new Promise(resolve => GLib.timeout_add(GLib.PRIORITY_DEFAULT, ms, () => {
     resolve();
@@ -113,13 +114,16 @@ function leftEdge(actor, effect) {
 function openWindow(appId = 'org.dockglass.Probe.desktop') {
     const app = Shell.AppSystem.get_default().lookup_app(appId);
     return new Promise(resolve => {
-        const id = global.window_manager.connect('map', (_wm, actor) => {
+        let id = global.window_manager.connect('map', (_wm, actor) => {
             if (actor.meta_window?.get_window_type() !== Meta.WindowType.NORMAL)
                 return;
             global.window_manager.disconnect(id);
+            id = 0;
             resolve(actor);
         });
         wait(8000).then(() => {
+            if (!id)
+                return;
             global.window_manager.disconnect(id);
             resolve(null);
         });
@@ -155,6 +159,67 @@ function watchDestroy(actor) {
     return state;
 }
 
+// The genie's wait and timeline, as plain data.
+function state(effect) {
+    if (!effect)
+        return {effect: 'none'};
+    return {
+        repaintId: Boolean(effect._repaintId),
+        waitId: Boolean(effect._waitId),
+        timeline: effect.timeline === null ? 'null' : effect.timeline?.is_playing() ? 'playing' : 'stopped',
+        actor: effect.actor ? 'set' : 'null',
+    };
+}
+const isWaiting = effect => Boolean(effect?._repaintId) && Boolean(effect?._waitId) &&
+    Boolean(effect.timeline) && !effect.timeline.is_playing();
+const isDead = effect => Boolean(effect) && effect.timeline === null && !effect._repaintId && !effect._waitId;
+
+async function closeWindow(actor) {
+    if (!actor)
+        return;
+    const gone = watchDestroy(actor);
+    actor.meta_window.delete(global.get_current_time());
+    await msUntil(() => gone.gone, 4000);
+}
+
+// How many frames the stage updates over ms milliseconds: about none while
+// nothing animates.
+async function frames(ms) {
+    let count = 0;
+    const id = global.stage.connect('before-update', () => count++);
+    await wait(ms);
+    global.stage.disconnect(id);
+    return count;
+}
+
+// A window closed during a workspace switch loses its actor with no
+// kill-window-effects or destroy signal; its genie must still end instead
+// of driving the frame clock until the next garbage collection.
+async function workspaceClose(label, appId) {
+    const workspaces = global.workspace_manager;
+    if (workspaces.get_n_workspaces() < 2)
+        workspaces.append_new_workspace(false, global.get_current_time());
+    const actor = await openWindow(appId);
+    if (!actor) {
+        check(`${label}: the window maps`, false);
+        return;
+    }
+    const effect = genie(actor);
+    const ref = effect ? new WeakRef(effect) : null;
+    const gone = watchDestroy(actor);
+    workspaces.get_workspace_by_index(1).activate(global.get_current_time());
+    await wait(30);
+    actor.meta_window.delete(global.get_current_time());
+    await wait(3000);
+    const left = ref?.deref();
+    const after = left ? {alive: true, ...state(left)} : {alive: false};
+    const framesAfter = await frames(2000);
+    check(`${label}: the genie ends`, Boolean(ref) && gone.gone && (!after.alive || after.timeline === 'null'),
+        JSON.stringify({gone: gone.gone, after, framesAfter}));
+    workspaces.get_workspace_by_index(0).activate(global.get_current_time());
+    await wait(1500);
+}
+
 async function run() {
     await wait(4000);
     Main.overview.hide();
@@ -186,7 +251,7 @@ async function run() {
     // --- An X11 window maps before its app has drawn it: the open genie
     // waits inside the icon for the first repaint (well before its 1.5 s
     // limit), then plays.
-    const ax = await openWindow('org.dockglass.ProbeX11.desktop');
+    const ax = await openWindow(X11);
     check('X11 open: the window maps', Boolean(ax));
     if (ax) {
         const waiting = genie(ax);
@@ -201,6 +266,111 @@ async function run() {
         await wait(ANIM_MS);
         check('X11 open: window closed', goneX.gone);
     }
+
+    // --- An X11 window closed while its genie waits.
+    const x2 = await openWindow(X11);
+    const e2 = genie(x2);
+    const waiting2 = isWaiting(e2);
+    const gone2x = watchDestroy(x2);
+    x2.meta_window.delete(global.get_current_time());
+    await wait(2500);
+    check('X11 closed while its genie waits: genie dropped, waits cleared', gone2x.gone && isDead(e2),
+        `waitingAtClose=${waiting2} ${JSON.stringify(state(e2))}`);
+
+    // --- The overview opens while an X11 genie waits.
+    const x4 = await openWindow(X11);
+    const e4 = genie(x4);
+    const waiting4 = isWaiting(e4);
+    Main.overview.show();
+    const dropped4 = await msUntil(() => isDead(e4), 3000);
+    check('overview while an X11 genie waits: genie dropped', dropped4 !== null && !genie(x4),
+        `waitingAtShow=${waiting4} ms=${dropped4} ${JSON.stringify(state(e4))}`);
+    await wait(1000);
+    Main.overview.hide();
+    await wait(1500);
+    check('overview closed: the X11 window is shown', x4.visible && !genie(x4) && !x4.meta_window.minimized, names(x4));
+
+    // --- An X11 window minimized right after mapping, while its genie waits.
+    const x5 = await openWindow(X11);
+    const e5 = genie(x5);
+    const waiting5 = isWaiting(e5);
+    x5.meta_window.minimize();
+    await wait(80);
+    const m5 = genie(x5);
+    check('minimize while an X11 genie waits: map genie dropped, minimize genie plays',
+        isDead(e5) && Boolean(m5?.minimize) && m5 !== e5, `waitingAtMinimize=${waiting5} map=${JSON.stringify(state(e5))} now=${names(x5)}`);
+    await wait(ANIM_MS);
+    settled('X11 minimized while its genie waited', x5, true);
+    x5.meta_window.unminimize();
+    await wait(ANIM_MS);
+    settled('X11 restored', x5, false);
+    await closeWindow(x5);
+    await closeWindow(x4);
+
+    // --- The Files stack's launch hold ends once, after the X11 window's
+    // genie, and once when that window closes while its genie waits.
+    let dockGlass = Main.extensionManager.lookup(DG).stateObj;
+    let released = 0;
+    let effectsAtRelease = null;
+    let x7 = null;
+    dockGlass._holdDockForLaunch(() => {
+        released++;
+        effectsAtRelease = x7 ? names(x7) : 'not mapped';
+    });
+    x7 = await openWindow(X11);
+    const waiting7 = isWaiting(genie(x7));
+    const released7 = await msUntil(() => released > 0, 4000);
+    await wait(3500);
+    check('launch hold, X11 window: released once, after its genie', released === 1 && effectsAtRelease === 'none',
+        `waitingAtMap=${waiting7} msAfterMap=${released7} released=${released} effectsAtRelease=${effectsAtRelease}`);
+    released = 0;
+    dockGlass._holdDockForLaunch(() => released++);
+    const x7b = await openWindow(X11);
+    const e7b = genie(x7b);
+    const waiting7b = isWaiting(e7b);
+    x7b.meta_window.delete(global.get_current_time());
+    await msUntil(() => released > 0, 4000);
+    await wait(3500);
+    check('launch hold, X11 window closed while waiting: released once, genie dropped', released === 1 && isDead(e7b),
+        `waitingAtClose=${waiting7b} released=${released} ${JSON.stringify(state(e7b))}`);
+    await closeWindow(x7);
+
+    // --- Dock Glass disabled while an X11 genie waits: dropped, window
+    // shown, whenOpened called once.
+    const x3 = await openWindow(X11);
+    const e3 = genie(x3);
+    const waiting3 = isWaiting(e3);
+    let opened3 = 0;
+    dockGlass._genieAnimation.whenOpened(x3, () => opened3++);
+    Main.extensionManager.disableExtension(DG);
+    await wait(300);
+    check('Dock Glass disabled while an X11 genie waits: dropped, window shown, whenOpened once',
+        isDead(e3) && !genie(x3) && x3.visible && opened3 === 1, `waitingAtDisable=${waiting3} calls=${opened3} ${JSON.stringify(state(e3))}`);
+    await wait(2000);
+    check('Dock Glass disabled while waiting, 2 s later: whenOpened still once', opened3 === 1 && !genie(x3), `calls=${opened3}`);
+    await setExtension(DG, true, 2000);
+    dockGlass = Main.extensionManager.lookup(DG).stateObj;
+    await closeWindow(x3);
+
+    // --- Windows closed during a workspace switch mid-genie (Wayland) and
+    // while the genie waits (X11).
+    await workspaceClose('Wayland window closed during a workspace switch mid-genie');
+    await workspaceClose('X11 window closed during a workspace switch while its genie waits', X11);
+
+    // --- The compositor stalls 300 ms mid-minimize: the genie slows down
+    // instead of skipping, and the minimize still completes once.
+    w1.minimize();
+    await wait(100);
+    const stalled = genie(a1);
+    GLib.usleep(300000);
+    const afterStall = await msUntil(() => !genie(a1), 3000);
+    check('stall mid-minimize: the genie goes on after the stall', Boolean(stalled?.minimize) && afterStall !== null && afterStall > 150,
+        `msAfterStall=${afterStall}`);
+    await wait(ANIM_MS);
+    settled('stall mid-minimize', a1, true);
+    w1.unminimize();
+    await wait(ANIM_MS);
+    settled('restore after the stall', a1, false);
 
     // --- A restore that interrupts a minimize, and the reverse.
     w1.minimize();
