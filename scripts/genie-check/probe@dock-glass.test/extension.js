@@ -713,6 +713,26 @@ async function run() {
     await wait(ANIM_MS);
     check('injected fault: actor gone after close', gone3.gone);
 
+    // --- Injected fault: a callback waiting on the genie throws. The ones
+    // after it must still run, or a dock held for a launch would stay shown.
+    a4.meta_window.minimize();
+    await wait(80);
+    const effect4 = genie(a4);
+    let laterCallbackRan = false;
+    effect4?.whenDone(() => {
+        throw new Error('injected');
+    });
+    effect4?.whenDone(() => {
+        laterCallbackRan = true;
+    });
+    await wait(ANIM_MS);
+    check('throwing callback: genie before', Boolean(effect4), names(a4));
+    check('throwing callback: later callback still runs', laterCallbackRan);
+    settled('throwing callback: minimize', a4, true);
+    a4.meta_window.unminimize();
+    await wait(ANIM_MS);
+    settled('throwing callback: restore', a4, false);
+
     const a4gone = watchDestroy(a4);
     a4.meta_window.delete(global.get_current_time());
     await wait(ANIM_MS);
