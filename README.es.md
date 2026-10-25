@@ -155,6 +155,7 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 | `po/` | Traducciones, un `<idioma>.po` por idioma |
 | `scripts/build-locale.sh` | Compila `po/` en `locale/`, donde GNOME Shell las lee |
 | `scripts/pack.sh` | Genera el zip instalable, con las traducciones |
+| `scripts/genie-check/` | Prueba del genio con ventanas reales en un GNOME Shell sin pantalla, en Docker |
 | `.github/workflows/ci.yml` | Pruebas, verificación de sintaxis y empaquetado en GitHub Actions, más versiones publicadas con etiquetas `v*` |
 
 La matemática pura y el adaptador del dock no importan nada de GNOME, así que Node.js 22 o más nuevo puede probarlos desde la raíz del repositorio:
@@ -171,7 +172,13 @@ sh scripts/pack.sh
 
 GitHub Actions ejecuta las pruebas, una verificación de sintaxis de cada módulo y el empaquetado en cada pull request y en cada push a `main`. Al subir una etiqueta `v*`, además publica una versión en GitHub con el zip empaquetado.
 
-El lado de GNOME Shell no tiene pruebas automáticas. Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
+El resto del lado de GNOME Shell no tiene pruebas automáticas en CI. El genio, que retiene el minimizado y la restauración del gestor de ventanas hasta terminar, tiene una prueba en un GNOME Shell sin pantalla dentro de Docker (unos siete minutos, 1,5 GB de disco por imagen): ventanas GTK reales (una de ellas cliente X11) se abren, minimizan y restauran mientras Dock Glass y Magic Lamp se activan y desactivan, y cada minimizado y restauración debe completarse exactamente una vez.
+
+```sh
+sh scripts/genie-check/run.sh 46   # o 51
+```
+
+Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
 
 ```sh
 ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io

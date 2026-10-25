@@ -155,6 +155,7 @@ To check a version by hand, use a virtual machine (GNOME Boxes, for example) wit
 | `po/` | Translations, one `<language>.po` per language |
 | `scripts/build-locale.sh` | Compiles `po/` into `locale/`, where GNOME Shell reads them |
 | `scripts/pack.sh` | Builds the installable zip, translations included |
+| `scripts/genie-check/` | Headless GNOME Shell check of the genie with real windows, in Docker |
 | `.github/workflows/ci.yml` | Tests, syntax check and packing on GitHub Actions, plus releases on `v*` tags |
 
 The pure math and the dock adapter have no GNOME imports, so Node.js 22 or newer can test them from the repository root:
@@ -171,7 +172,13 @@ sh scripts/pack.sh
 
 GitHub Actions runs the tests, a syntax check of every module and the packing on every pull request and push to `main`. Pushing a `v*` tag also publishes a GitHub release with the packed zip.
 
-The GNOME Shell side has no automated tests. For development, symlink your clone instead of cloning into the extensions folder:
+The rest of the GNOME Shell side has no automated tests in CI. The genie, which holds the window manager's minimize and restore until it ends, has a check in a headless GNOME Shell inside Docker (about seven minutes, 1.5 GB of disk per image): real GTK windows (one of them an X11 client) open, minimize and restore while Dock Glass and Magic Lamp are turned on and off, and every minimize and restore must complete exactly once.
+
+```sh
+sh scripts/genie-check/run.sh 46   # or 51
+```
+
+For development, symlink your clone instead of cloning into the extensions folder:
 
 ```sh
 ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
