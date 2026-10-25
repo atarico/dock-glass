@@ -1,0 +1,6 @@
+{
+  "uuid": "probe@dock-glass.test",
+  "name": "Dock Glass genie probe",
+  "description": "Drives real windows through the genie for scripts/genie-check. Not for normal use.",
+  "shell-version": ["46", "47", "48", "49", "50", "51"]
+}

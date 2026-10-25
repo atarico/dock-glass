@@ -21,7 +21,7 @@ https://github.com/user-attachments/assets/d73059d8-f738-452c-ac48-0fbdbee42390
 
 https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 
-*Minimizar y restaurar con la extensión complementaria Magic Lamp. Dock Glass dirige su genio al lugar de reposo del ícono en el dock.*
+*Minimizar y restaurar: la ventana entra en el lugar de reposo del ícono en el dock y vuelve a salir de él.*
 
 ## Funciones
 
@@ -30,12 +30,12 @@ https://github.com/user-attachments/assets/dc25134f-0db5-4ce9-8d47-6a419962a23b
 | Magnificación | Los íconos crecen desde su borde inferior a medida que el puntero se mueve sobre el dock: 1,4x bajo el puntero y de vuelta al tamaño normal tres íconos más allá. Como en macOS, ningún ícono se achica: los vecinos se separan y la píldora se ensancha para contenerlos |
 | Píldora de vidrio | Un dock completamente redondeado con un borde interior claro, pensado para usarse sobre el Liquid Glass de Blur My Shell |
 | Rebote al abrir | Un ícono rebota hasta que la aplicación que abrió muestra su ventana |
-| Genio al abrir | Las ventanas nuevas salen de su ícono del dock, desde donde se dibuja aunque esté agrandado, en lugar de la animación de apertura de GNOME. macOS usa el genio solo para minimizar y restaurar; este es un agregado de Dock Glass |
+| Genio | Las ventanas entran en su ícono del dock al minimizarse y vuelven a salir de él al restaurarse, y las ventanas nuevas salen de él al abrirse, desde donde se dibuja aunque esté agrandado. La ventana se encuentra con el dock en el borde superior de su píldora, así nunca pasa por detrás del dock. Reemplaza las animaciones de GNOME. macOS usa el genio solo para minimizar y restaurar; el genio al abrir es un agregado de Dock Glass |
 | Pila de lugares de Archivos | Sin ventanas de Archivos abiertas, un clic en su ícono despliega en abanico los lugares (carpeta personal, Escritorio, Documentos, Descargas, Imágenes y marcadores). Los elementos salen del ícono y vuelven a entrar en él cuando la pila se cierra. Con ventanas de Archivos abiertas, el clic funciona como siempre |
 | Archivos junto a la Papelera | Cuando Archivos es la última aplicación anclada, el separador pasa a su izquierda, así Archivos queda junto a la Papelera como las carpetas del Dock de macOS |
 | Punto de ejecución | Un punto pequeño debajo de cada aplicación abierta |
 
-Para tener también el genio al minimizar y restaurar, se puede agregar [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect) (ver Configuración recomendada).
+Dock Glass hace el genio al minimizar y restaurar por su cuenta, así que ya no necesita [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect). Si Magic Lamp está instalado, conviene desactivarlo: mientras está activado, Dock Glass le deja minimizar y restaurar.
 
 ## Instalación
 
@@ -81,7 +81,7 @@ Con Dash to Dock de extensions.gnome.org, configurar esas mismas cuatro opciones
 | Static blur (desenfoque estático) | Desactivado, para que el vidrio desenfoque lo que realmente está detrás del dock |
 | Pipeline | Un solo efecto "Liquid Glass": blur radius 10, edge size 16, tint 0, shadow 0.1, specular strength 0.6 |
 
-**Complementos opcionales.** [Magic Lamp](https://github.com/hermes83/compiz-alike-magic-lamp-effect) para el genio al minimizar y restaurar. [Burn My Windows](https://github.com/Schneegans/Burn-My-Windows) para los efectos de cierre; Dock Glass le deja el cierre de ventanas. Desactivar sus efectos de apertura, así las ventanas nuevas solo tienen el genio.
+**Complemento opcional.** [Burn My Windows](https://github.com/Schneegans/Burn-My-Windows) para los efectos de cierre; Dock Glass le deja el cierre de ventanas. Desactivar sus efectos de apertura, así las ventanas nuevas solo tienen el genio. Desactivar Magic Lamp si está instalado: Dock Glass minimiza y restaura por su cuenta, y se lo deja a Magic Lamp mientras está activado.
 
 ## Compatibilidad
 
@@ -133,7 +133,7 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 - **Magnificación.** Un `Clutter.Timeline` por dock lee el puntero en cada cuadro mientras está sobre la píldora. `magnifier.js` convierte la distancia de cada ícono al puntero suavizado en una escala (una caída coseno), y el ancho extra de los íconos intermedios en un desplazamiento lateral. La extensión los aplica solo como transformaciones: la escala en cada ícono, el desplazamiento en su botón (así el punto de ejecución lo sigue) y en el separador, y una escala y un desplazamiento horizontales en el fondo de la píldora, que el vidrio de Blur My Shell sigue. Las asignaciones de tamaño del dock nunca cambian, así que su región de entrada, el ocultamiento inteligente y los destinos al minimizar mantienen su geometría de reposo. El ciclo se detiene cuando los íconos se estabilizan, se reinicia con el movimiento del puntero y vuelve exactamente al diseño de reposo cuando el puntero se va.
 - **Eventos.** Los eventos del puntero vienen de `dashtodockBox`, la caja reactiva del dock que sigue el paso del puntero. Clutter no pasa eventos a través del contenedor del dock, que no es reactivo.
 - **Pilas.** Archivos recibe un reemplazo de `activate` en su instancia que abre la pila de lugares solo con un clic izquierdo simple y sin ventanas de Archivos. La pila es un actor transparente que cubre todo el escenario bajo `Main.pushModal`, y se cierra con un clic afuera, un clic en el ícono o Escape. El dock sigue visible mientras está abierta gracias al estado de menú de elementos de Ubuntu Dock. La opacidad se anima por separado del movimiento elástico, porque Clutter la guarda en 8 bits y un modo de animación que se pasa de largo la haría dar la vuelta.
-- **Genio al abrir.** Un envoltorio de `Main.wm._shouldAnimateActor` omite la animación de apertura de GNOME para las ventanas normales de aplicaciones, y un manejador de `map` agrega en su lugar el efecto de deformación del genio. Parte del ícono del dock de la aplicación tal como se dibuja en ese momento, en el monitor de la ventana cuando la aplicación tiene un ícono ahí. El envoltorio se retira solo mientras sigue siendo el más externo, así convive sin problemas con Burn My Windows y Magic Lamp.
+- **Genio.** Un envoltorio de `Main.wm._shouldAnimateActor` omite la animación de apertura de GNOME para las ventanas normales de aplicaciones, y un manejador de `map` agrega en su lugar el efecto de deformación del genio. Parte del ícono del dock de la aplicación tal como se dibuja en ese momento, en el monitor de la ventana cuando la aplicación tiene un ícono ahí. La punta del genio queda en el borde interno del dock (el borde superior de la píldora de un dock inferior) en lugar del borde de la pantalla, así la ventana nunca pasa por detrás del dock; `genieGeometry.js` mide ese borde, y mientras el dock está oculto el genio sigue usando el borde de la pantalla. Minimizar y restaurar pasan por el mismo envoltorio, pero sin animación GNOME los completa en el acto y oculta o muestra la ventana antes de cualquier genio. Por eso Dock Glass también envuelve `completed_minimize` y `completed_unminimize` del gestor de ventanas: para las ventanas que tomó, retiene la llamada y la hace cuando el genio termina, o cuando se descarta porque empieza el efecto siguiente, la ventana se cierra, se abre la vista general o se desactiva Dock Glass. Minimizar y restaurar apuntan al lugar de reposo del ícono, el destino de minimizado que publica el dock. Se toman solo cuando GNOME los animaría, así que un efecto omitido (el selector de ventanas restaura sin efecto) y la vista general mantienen el comportamiento de GNOME, y mientras Magic Lamp está activado su propio envoltorio los rechaza y se los deja a él. Una ventana X11 se mapea antes de que su aplicación la dibuje, así que en X11 el genio de una ventana nueva espera dentro del ícono hasta que la ventana se repinta por primera vez, como mucho 1,5 s. El genio lleva su propio tiempo y avanza como mucho un cuadro de 30 fps por cuadro dibujado, así una aplicación que frena el compositor al arrancar (Brave, VS Code) lo hace más lento en lugar de saltarse su comienzo. Los envoltorios se retiran solo mientras siguen siendo los más externos, así conviven sin problemas con Burn My Windows y Magic Lamp.
 - **Separador.** Ubuntu Dock vuelve a insertar el separador después de las aplicaciones ancladas en cada redibujado. Cuando el ícono anterior es Archivos, la extensión lo mueve un lugar a la izquierda antes del siguiente cuadro. El separador no es un elemento de aplicación, así que la lista de aplicaciones del dock y el arrastrar y soltar no se ven afectados. Al desactivar la extensión, el movimiento se deshace.
 
 </details>
@@ -144,8 +144,9 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 |---------|---------|
 | `extension.js` | Se engancha al dock: magnificación, recortes, separador, pila de Archivos, rebote al abrir |
 | `dockAdapter.js` | El único acceso a las partes privadas de Ubuntu Dock y Dash to Dock: cómo se carga el módulo de cada dock instalado, cuál está corriendo, su administrador de docks y los actores de cada dock |
-| `openAnimation.js` | Reemplaza la animación de apertura de ventanas por el genio |
+| `genieAnimation.js` | Reemplaza las animaciones de apertura, minimizado y restauración por el genio |
 | `genieEffect.js` | El efecto de deformación del genio |
+| `genieGeometry.js` | Matemática pura del genio: las etapas con que sale la ventana y el borde interno del dock |
 | `magnifier.js` | Matemática pura de la magnificación |
 | `stack.js` | La ventana emergente de la pila: actores, animaciones, entrada |
 | `stackLayout.js` | Matemática pura de la disposición de la pila |
@@ -154,6 +155,7 @@ Para probar una versión a mano, usar una máquina virtual (por ejemplo, GNOME B
 | `po/` | Traducciones, un `<idioma>.po` por idioma |
 | `scripts/build-locale.sh` | Compila `po/` en `locale/`, donde GNOME Shell las lee |
 | `scripts/pack.sh` | Genera el zip instalable, con las traducciones |
+| `scripts/genie-check/` | Prueba del genio con ventanas reales en un GNOME Shell sin pantalla, en Docker |
 | `.github/workflows/ci.yml` | Pruebas, verificación de sintaxis y empaquetado en GitHub Actions, más versiones publicadas con etiquetas `v*` |
 
 La matemática pura y el adaptador del dock no importan nada de GNOME, así que Node.js 22 o más nuevo puede probarlos desde la raíz del repositorio:
@@ -170,7 +172,13 @@ sh scripts/pack.sh
 
 GitHub Actions ejecuta las pruebas, una verificación de sintaxis de cada módulo y el empaquetado en cada pull request y en cada push a `main`. Al subir una etiqueta `v*`, además publica una versión en GitHub con el zip empaquetado.
 
-El lado de GNOME Shell no tiene pruebas automáticas. Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
+El resto del lado de GNOME Shell no tiene pruebas automáticas en CI. El genio, que retiene el minimizado y la restauración del gestor de ventanas hasta terminar, tiene una prueba en un GNOME Shell sin pantalla dentro de Docker (unos cuatro minutos con la imagen ya construida, 1,5 GB de disco por imagen): ventanas GTK reales (una de ellas cliente X11) se abren, minimizan y restauran mientras Dock Glass y Magic Lamp se activan y desactivan, y cada minimizado y restauración debe completarse exactamente una vez.
+
+```sh
+sh scripts/genie-check/run.sh 46   # o 51
+```
+
+Para desarrollar, crear un enlace simbólico al clon en lugar de clonar dentro de la carpeta de extensiones:
 
 ```sh
 ln -s "$PWD" ~/.local/share/gnome-shell/extensions/dock-glass@atarico.github.io
@@ -186,4 +194,4 @@ journalctl -f -o cat /usr/bin/gnome-shell
 
 [GPL-3.0 o posterior](LICENSE). Copyright (C) 2026 atarico.
 
-`genieEffect.js` está adaptado del efecto de restauración de [Compiz alike magic lamp effect](https://github.com/hermes83/compiz-alike-magic-lamp-effect), de hermes83 (GPL-3.0 o posterior).
+`genieEffect.js` está adaptado de los efectos de minimizado y restauración de [Compiz alike magic lamp effect](https://github.com/hermes83/compiz-alike-magic-lamp-effect), de hermes83 (GPL-3.0 o posterior).

@@ -2,8 +2,9 @@
 // Dock Glass: continuous macOS-like magnification and a launch bounce for
 // the icons of Ubuntu Dock or Dash to Dock, a macOS-like places stack
 // (stack.js) for Files, and a genie effect from the dock icon when a window
-// opens (openAnimation.js). The dock's private internals are reached only
-// through dockAdapter.js. The pill shape lives in stylesheet.css.
+// opens, minimizes or is restored (genieAnimation.js). The dock's private
+// internals are reached only through dockAdapter.js. The pill shape lives in
+// stylesheet.css.
 import Clutter from 'gi://Clutter';
 import GLib from 'gi://GLib';
 import Meta from 'gi://Meta';
@@ -18,7 +19,7 @@ import {
     keepFocusInSync,
 } from './dockAdapter.js';
 import {approach, magnify} from './magnifier.js';
-import {OpenAnimation} from './openAnimation.js';
+import {GenieAnimation} from './genieAnimation.js';
 import {Stack, listPlaces} from './stack.js';
 
 // Stacks. Files opens its places stack only while it has no windows, so a
@@ -58,6 +59,15 @@ const BOUNCE_TIMEOUT_S = 10;
 // poured out of the stack's icon, and at most this long when no window opens.
 const LAUNCH_HOLD_MAX_MS = 3000;
 
+// An actor's rect in stage coordinates, or null without one.
+function stageRect(actor) {
+    if (!actor)
+        return null;
+    const [x, y] = actor.get_transformed_position();
+    const [width, height] = actor.get_transformed_size();
+    return [x, y, width, height].every(Number.isFinite) ? {x, y, width, height} : null;
+}
+
 export default class DockGlassExtension extends Extension {
     enable() {
         this._enabled = true;
@@ -82,13 +92,13 @@ export default class DockGlassExtension extends Extension {
             }, this);
         DOCK_UUIDS.forEach(uuid => this._loadDock(uuid));
 
-        this._openAnimation = new OpenAnimation(window => this._findIconRect(window));
-        this._openAnimation.enable();
+        this._genieAnimation = new GenieAnimation(window => this._findDockIcon(window));
+        this._genieAnimation.enable();
     }
 
     disable() {
-        this._openAnimation.disable();
-        this._openAnimation = null;
+        this._genieAnimation.disable();
+        this._genieAnimation = null;
 
         this._enabled = false;
         if (this._retryId)
@@ -319,13 +329,13 @@ export default class DockGlassExtension extends Extension {
             hold.end();
             return GLib.SOURCE_REMOVE;
         });
-        // Connected after OpenAnimation's own map handler, so the genie is
+        // Connected after GenieAnimation's own map handler, so the genie is
         // already attached when this one runs.
         global.window_manager.connectObject('map', (_wm, actor) => {
             if (actor.meta_window?.get_window_type() !== Meta.WindowType.NORMAL)
                 return;
             global.window_manager.disconnectObject(hold);
-            this._openAnimation.whenOpened(actor, hold.end);
+            this._genieAnimation.whenOpened(actor, hold.end);
         }, hold);
     }
 
@@ -469,24 +479,24 @@ export default class DockGlassExtension extends Extension {
     }
 
     // Rect of the window's app icon as drawn, magnified and spread or not,
-    // preferring the dock on the window's monitor. A launch bounce moves only
-    // its clone, so the icon stays on the dock.
-    _findIconRect(window) {
+    // and of its dock's pill (null without one), preferring the dock on the
+    // window's monitor. A launch bounce moves only its clone, so the icon
+    // stays on the dock.
+    _findDockIcon(window) {
         const app = Shell.WindowTracker.get_default().get_window_app(window);
         const monitor = Main.layoutManager.monitors[window.get_monitor()];
         let fallback = null;
-        for (const [button, {icon}] of this._buttons) {
+        for (const [button, {icon, dock}] of this._buttons) {
             if (!app || button.app !== app)
                 continue;
 
-            const [x, y] = icon.get_transformed_position();
-            const [width, height] = icon.get_transformed_size();
-            if (![x, y, width, height].every(Number.isFinite))
+            const rect = stageRect(icon);
+            if (!rect)
                 continue;
-            const rect = {x, y, width, height};
-            if (monitor && x >= monitor.x && x < monitor.x + monitor.width)
-                return rect;
-            fallback ??= rect;
+            const found = {icon: rect, dock: stageRect(dock.background)};
+            if (monitor && rect.x >= monitor.x && rect.x < monitor.x + monitor.width)
+                return found;
+            fallback ??= found;
         }
         return fallback;
     }
