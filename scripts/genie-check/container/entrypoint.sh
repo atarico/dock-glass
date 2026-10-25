@@ -42,7 +42,8 @@ mkdir -p "$XDG_RUNTIME_DIR"
 chmod 700 "$XDG_RUNTIME_DIR"
 
 # dock-fixed keeps the dock shown: intellihide would hide it under windows.
-# The probe runs about three minutes; ten is the limit.
+# The probe runs about three minutes; ten is the limit. A shell that exits
+# before the probe is done ends the wait at once.
 dbus-run-session -- sh -c "
     gsettings set org.gnome.shell enabled-extensions \"['ubuntu-dock@ubuntu.com', 'dock-glass@atarico.github.io', 'probe@dock-glass.test']\"
     gsettings set org.gnome.shell favorite-apps \"['placeholder-1.desktop', 'org.dockglass.Probe.desktop', 'org.dockglass.ProbeX11.desktop', 'placeholder-2.desktop', 'placeholder-3.desktop']\"
@@ -53,6 +54,10 @@ dbus-run-session -- sh -c "
     shell=\$!
     for _ in \$(seq 600); do
         grep -q 'DGPROBE DONE\|DGPROBE CRASH' /tmp/shell.log && break
+        if ! kill -0 \$shell 2> /dev/null; then
+            echo 'gnome-shell exited before the probe was done'
+            break
+        fi
         sleep 1
     done
     kill \$shell 2> /dev/null || true
