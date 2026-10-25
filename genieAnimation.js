@@ -20,6 +20,20 @@ const HANDLERS = [
     ['_unminimizeWindow@', 'unminimize'],
 ];
 
+// The window's surface actor, found as the child that has its
+// repaint-scheduled signal: mutter does not expose its type to JS, but
+// connecting by name looks the signal up on the actual type.
+function findSurface(actor) {
+    return actor.get_children().find(child => {
+        try {
+            child.disconnect(child.connect('repaint-scheduled', () => {}));
+            return true;
+        } catch {
+            return false;
+        }
+    }) ?? null;
+}
+
 export class GenieAnimation {
     // findDockIcon(window) returns {icon, dock}, the rects of the app's dock
     // icon and of that dock's pill (or null), or null without a dock icon.
@@ -144,19 +158,25 @@ export class GenieAnimation {
         if (!this._take(actor, 'map'))
             return;
 
+        // An X11 window maps before its app has drawn it, so a genie started
+        // now would pour out an empty window (Brave, VS Code or Firefox take
+        // that long to start): start it when the window's surface first
+        // repaints. A Wayland window maps already drawn.
+        const startOnRepaint = actor.meta_window.get_client_type() === Meta.WindowClientType.X11
+            ? findSurface(actor) : null;
         actor.show();
-        this._play(actor);
+        this._play(actor, {startOnRepaint});
     }
 
     // Pours the window out of its dock icon, or into it when minimizing.
     // onDone runs once, when the genie ends or is dropped, or at once when
     // there is none, so a held minimize or restore always completes.
-    _play(actor, {minimize = false, fromRestSlot = false, onDone = null} = {}) {
+    _play(actor, {minimize = false, fromRestSlot = false, startOnRepaint = null, onDone = null} = {}) {
         let effect = null;
         try {
             actor.get_effect(EFFECT_NAME)?.destroy();
             const target = this._getTarget(actor.meta_window, fromRestSlot);
-            effect = new GenieEffect({...target, minimize, onDone});
+            effect = new GenieEffect({...target, minimize, startOnRepaint, onDone});
             actor.add_effect_with_name(EFFECT_NAME, effect);
         } catch (e) {
             console.error(`[dock-glass] Cannot play the genie: ${e}`);
@@ -172,11 +192,11 @@ export class GenieAnimation {
     }
 
     // Calls done once the genie of a window that just mapped has poured it
-    // out, or at once when the window opens without one.
+    // out or was dropped, or at once when the window opens without one.
     whenOpened(actor, done) {
-        const timeline = actor.get_effect(EFFECT_NAME)?.timeline;
-        if (timeline)
-            timeline.connect('completed', () => done());
+        const effect = actor.get_effect(EFFECT_NAME);
+        if (effect)
+            effect.whenDone(done);
         else
             done();
     }

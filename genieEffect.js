@@ -15,9 +15,11 @@
  * Changes: merged the abstract, minimize and unminimize classes (minimizing
  * runs the stages backwards), the caller completes the window manager's
  * minimize or unminimize through onDone, the genie ends at the dock's inner
- * edge instead of the screen edge, stop the timeline on destroy, and return
+ * edge instead of the screen edge, it can wait for the window's first
+ * drawing, it advances by frame, stop the timeline on destroy, and return
  * right after destroying in overview.
  */
+import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
@@ -33,6 +35,13 @@ const X_TILES = 10;
 const Y_TILES = 10;
 // Distance from a monitor edge within which the icon counts as on that edge.
 const EPSILON = 40;
+// Longest a genie waits, collapsed into the icon, for the window's first
+// drawing.
+const DRAWING_WAIT_MAX_MS = 1500;
+// Most a genie advances in one frame: a 30 fps frame. Slower frames, such as
+// while Brave or VS Code start and hold up the compositor, slow it down
+// instead of skipping its stages.
+const MAX_FRAME_STEP_MS = 1000 / 30;
 
 export class GenieEffect extends Clutter.DeformEffect {
     static {
@@ -42,6 +51,9 @@ export class GenieEffect extends Clutter.DeformEffect {
     // icon: the rect the window pours out of or into. dock: the rect of the
     // dock's pill, or null. minimize: pour into the icon instead of out of
     // it. onDone: called once when the genie ends or is dropped.
+    // startOnRepaint: an actor that emits repaint-scheduled (the window's
+    // surface), whose next repaint starts the genie; until then the window
+    // stays collapsed into the icon.
     _init(params = {}) {
         super._init();
 
@@ -49,6 +61,12 @@ export class GenieEffect extends Clutter.DeformEffect {
         this.dock = params.dock ?? null;
         this.minimize = Boolean(params.minimize);
         this._onDone = params.onDone ?? null;
+        this._whenDone = [];
+        this._startOnRepaint = params.startOnRepaint ?? null;
+        this._repaintId = 0;
+        this._waitId = 0;
+        this._duration = 0;
+        this._elapsed = 0;
         this.monitor = {x: 0, y: 0, width: 0, height: 0};
         this.iconMonitor = {x: 0, y: 0, width: 0, height: 0};
         this.window = {x: 0, y: 0, width: 0, height: 0};
@@ -72,7 +90,6 @@ export class GenieEffect extends Clutter.DeformEffect {
 
         this.timeline = null;
         this.newFrameId = 0;
-        this.completedId = 0;
         this.initialized = false;
     }
 
@@ -135,31 +152,59 @@ export class GenieEffect extends Clutter.DeformEffect {
 
         this.set_n_tiles(X_TILES, Y_TILES);
 
-        this.timeline = new Clutter.Timeline({
-            actor: this.actor,
-            duration: DURATION_MS + (this.monitor.width * this.monitor.height) / (this.window.width * this.window.height),
-        });
+        // The timeline only paces the frames: the genie keeps its own time
+        // (_onNewFrame) and ends itself.
+        this._duration = DURATION_MS + (this.monitor.width * this.monitor.height) / (this.window.width * this.window.height);
+        this.timeline = new Clutter.Timeline({actor: this.actor, duration: this._duration, repeat_count: -1});
         this.newFrameId = this.timeline.connect('new-frame', this._onNewFrame.bind(this));
-        this.completedId = this.timeline.connect('completed', () => this.destroy());
-        this.timeline.start();
+        if (this._startOnRepaint) {
+            this._repaintId = this._startOnRepaint.connect('repaint-scheduled', () => this._start());
+            this._waitId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, DRAWING_WAIT_MAX_MS, () => {
+                this._waitId = 0;
+                this._start();
+                return GLib.SOURCE_REMOVE;
+            });
+        } else {
+            this.timeline.start();
+        }
 
         // Only now may vfunc_deform_vertex collapse the window into the icon.
         this.initialized = true;
     }
 
+    _start() {
+        this._stopWaiting();
+        this.timeline?.start();
+    }
+
+    _stopWaiting() {
+        if (this._repaintId)
+            this._startOnRepaint.disconnect(this._repaintId);
+        this._repaintId = 0;
+        if (this._waitId)
+            GLib.source_remove(this._waitId);
+        this._waitId = 0;
+    }
+
+    // Calls callback once when the genie ends or is dropped.
+    whenDone(callback) {
+        this._whenDone.push(callback);
+    }
+
     destroy() {
+        this._stopWaiting();
         if (this.timeline) {
             this.timeline.disconnect(this.newFrameId);
-            this.timeline.disconnect(this.completedId);
             this.timeline.stop();
             this.timeline = null;
         }
 
         this.actor?.remove_effect(this);
 
-        const onDone = this._onDone;
+        const callbacks = [this._onDone, ...this._whenDone];
         this._onDone = null;
-        onDone?.();
+        this._whenDone = [];
+        callbacks.forEach(callback => callback?.());
     }
 
     _onNewFrame(timeline) {
@@ -171,7 +216,12 @@ export class GenieEffect extends Clutter.DeformEffect {
             return;
         }
 
-        const progress = timeline.get_progress();
+        this._elapsed += Math.min(timeline.get_delta(), MAX_FRAME_STEP_MS);
+        const progress = this._elapsed / this._duration;
+        if (progress >= 1) {
+            this.destroy();
+            return;
+        }
         ({k: this.k, j: this.j} = pourStage(this.minimize ? 1 - progress : progress));
 
         this.actor.get_parent()?.queue_redraw();
